@@ -476,14 +476,7 @@ export default function App() {
       <header className="topbar">
         <div className="topbar-brand">
           <Settings2 size={18} />
-          <div>
-            <p className="topbar-eyebrow">Charger Logistics</p>
-            <h1>Planning Board</h1>
-          </div>
-        </div>
-        <div className="topbar-search">
-          <Search size={15} />
-          <input placeholder="Search boards, customers, lanes…" />
+          <h1>Planning Board Config</h1>
         </div>
         <div className="topbar-actions">
           <button type="button" className="icon-btn" aria-label="Refresh">
@@ -534,33 +527,33 @@ export default function App() {
         <aside className="rail template-rail" aria-label="Configuration templates">
           <div className="rail-section">
             <div className="rail-section-head">
-              <div>
+              <div className="rail-section-titles">
                 <p className="rail-kicker">Selected board</p>
                 <h2>{board.shortName}</h2>
               </div>
-              <span>{templates.length}</span>
+              <div className="rail-section-actions">
+                <span className="rail-badge">{templates.length}</span>
+                <button type="button" className="rail-icon-btn" onClick={addTemplate} title="New template">
+                  <Plus size={15} />
+                </button>
+                <button
+                  type="button"
+                  className="rail-icon-btn"
+                  onClick={duplicateTemplate}
+                  title="Duplicate selected"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
             </div>
 
-            <div className="rail-toolbar">
-              <div className="rail-search light">
-                <Search size={13} />
-                <input
-                  value={templateQuery}
-                  onChange={(e) => setTemplateQuery(e.target.value)}
-                  placeholder="Search…"
-                />
-              </div>
-              <button type="button" className="rail-icon-btn" onClick={addTemplate} title="New template">
-                <Plus size={15} />
-              </button>
-              <button
-                type="button"
-                className="rail-icon-btn"
-                onClick={duplicateTemplate}
-                title="Duplicate selected"
-              >
-                <Copy size={14} />
-              </button>
+            <div className="rail-search light">
+              <Search size={13} />
+              <input
+                value={templateQuery}
+                onChange={(e) => setTemplateQuery(e.target.value)}
+                placeholder="Search…"
+              />
             </div>
 
             <ul className="rail-list">
