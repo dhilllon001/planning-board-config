@@ -4,7 +4,7 @@ export type DayKey = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun'
 
 export type CustomerMode = 'include' | 'exclude'
 
-export type ConfigTypeId = 'auto-accept' | 'customers' | 'regions' | 'notifications'
+export type ConfigSectionId = 'auto-accept' | 'customers' | 'regions' | 'notifications'
 
 export interface TimeWindow {
   start: string
@@ -48,7 +48,7 @@ export interface NotificationSettings {
   notifyRoles: string[]
 }
 
-export type ConfigPayloadMap = {
+export interface TemplateSettings {
   'auto-accept': AutoAcceptSettings
   customers: CustomerSettings
   regions: RegionSettings
@@ -63,6 +63,13 @@ export interface UserRef {
   initials: string
 }
 
+export interface ConfigHistoryEntry {
+  id: string
+  savedBy: UserRef
+  savedAt: string
+  reason: string
+}
+
 export interface ConfigMeta {
   createdBy: UserRef
   createdAt: string
@@ -72,21 +79,13 @@ export interface ConfigMeta {
   history: ConfigHistoryEntry[]
 }
 
-export interface ConfigHistoryEntry {
+export interface ConfigTemplate {
   id: string
-  savedBy: UserRef
-  savedAt: string
-  reason: string
-}
-
-export interface TypedConfig<T extends ConfigTypeId> {
-  type: T
-  data: ConfigPayloadMap[T]
+  name: string
+  description: string
+  active: boolean
+  settings: TemplateSettings
   meta: ConfigMeta
-}
-
-export type BoardConfigs = {
-  [K in ConfigTypeId]: TypedConfig<K>
 }
 
 export interface BoardMeta {
@@ -94,6 +93,7 @@ export interface BoardMeta {
   name: string
   shortName: string
   legCount: number
+  region: string
 }
 
 export interface CustomerOption {
@@ -108,8 +108,8 @@ export interface RegionOption {
   group: string
 }
 
-export interface ConfigTypeMeta {
-  id: ConfigTypeId
+export interface ConfigSectionMeta {
+  id: ConfigSectionId
   label: string
   description: string
 }

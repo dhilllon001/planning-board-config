@@ -1,10 +1,9 @@
 import type {
   AutoAcceptSettings,
-  BoardConfigs,
   BoardMeta,
   ConfigMeta,
-  ConfigTypeId,
-  ConfigTypeMeta,
+  ConfigSectionMeta,
+  ConfigTemplate,
   CustomerOption,
   CustomerSettings,
   DayKey,
@@ -12,6 +11,7 @@ import type {
   NotificationSettings,
   RegionOption,
   RegionSettings,
+  TemplateSettings,
   UserRef,
 } from '../types'
 
@@ -46,17 +46,31 @@ export const USERS: UserRef[] = [
     role: 'Planner',
     initials: 'RT',
   },
+  {
+    id: 'u-np',
+    name: 'Nina Patel',
+    email: 'nina.patel@chargerlogistics.com',
+    role: 'Planner',
+    initials: 'NP',
+  },
 ]
 
 export const BOARDS: BoardMeta[] = [
-  { id: 'ab-cdn-east', name: 'AB CDN East Coast Inbound', shortName: 'AB CDN East In', legCount: 63 },
-  { id: 'ab-cdn-west', name: 'AB CDN West Coast Inbound', shortName: 'AB CDN West In', legCount: 41 },
-  { id: 'ab-fleet-in', name: 'AB Fleet Inbound', shortName: 'AB Fleet In', legCount: 28 },
-  { id: 'ab-fleet-out', name: 'AB Fleet Outbound', shortName: 'AB Fleet Out', legCount: 34 },
-  { id: 'alex-kawalit', name: 'Alex Kawalit Board', shortName: 'Alex Kawalit', legCount: 19 },
+  { id: 'ab-cdn-east', name: 'AB CDN East Coast Inbound', shortName: 'AB CDN East In', legCount: 63, region: 'East' },
+  { id: 'ab-cdn-west', name: 'AB CDN West Coast Inbound', shortName: 'AB CDN West In', legCount: 41, region: 'West' },
+  { id: 'ab-fleet-in', name: 'AB Fleet Inbound', shortName: 'AB Fleet In', legCount: 28, region: 'Fleet' },
+  { id: 'ab-fleet-out', name: 'AB Fleet Outbound', shortName: 'AB Fleet Out', legCount: 34, region: 'Fleet' },
+  { id: 'alex-kawalit', name: 'Alex Kawalit Board', shortName: 'Alex Kawalit', legCount: 19, region: 'Custom' },
+  { id: 'midwest-auto', name: 'Midwest Automotive Inbound', shortName: 'Midwest Auto In', legCount: 52, region: 'Midwest' },
+  { id: 'texas-border', name: 'Texas Border Crossdock', shortName: 'TX Border', legCount: 37, region: 'South' },
+  { id: 'ontario-relay', name: 'Ontario Relay Network', shortName: 'Ontario Relay', legCount: 45, region: 'CDN' },
+  { id: 'reefer-priority', name: 'Reefer Priority Board', shortName: 'Reefer Priority', legCount: 22, region: 'Special' },
+  { id: 'power-only', name: 'Power Only Moves', shortName: 'Power Only', legCount: 31, region: 'Fleet' },
+  { id: 'weekend-surge', name: 'Weekend Surge Board', shortName: 'Weekend Surge', legCount: 16, region: 'Special' },
+  { id: 'glam-dedicated', name: 'GLAM Dedicated Lanes', shortName: 'GLAM Dedicated', legCount: 48, region: 'East' },
 ]
 
-export const CONFIG_TYPES: ConfigTypeMeta[] = [
+export const CONFIG_SECTIONS: ConfigSectionMeta[] = [
   {
     id: 'auto-accept',
     label: 'Auto Accept',
@@ -65,7 +79,7 @@ export const CONFIG_TYPES: ConfigTypeMeta[] = [
   {
     id: 'customers',
     label: 'Customers',
-    description: 'Include or exclude customers for this board.',
+    description: 'Include or exclude customers for this template.',
   },
   {
     id: 'regions',
@@ -88,6 +102,8 @@ export const CUSTOMERS: CustomerOption[] = [
   { id: 'c-honda', name: 'HONDA OF AMERICA', tag: 'LAM' },
   { id: 'c-nissan', name: 'NISSAN NORTH AMERICA', tag: 'Default' },
   { id: 'c-customer-c', name: 'Customer C', tag: 'Default' },
+  { id: 'c-bmw', name: 'BMW NA LOGISTICS', tag: 'GLAM' },
+  { id: 'c-vw', name: 'VW GROUP TRANSPORT', tag: 'LAM' },
 ]
 
 export const REGIONS: RegionOption[] = [
@@ -116,13 +132,13 @@ export const LEG_META = {
   pickup: {
     label: 'Pickup',
     short: 'P',
-    description: 'Auto-accept rules for pickup legs on this board.',
+    description: 'Auto-accept rules for pickup legs on this template.',
     accent: 'pickup',
   },
   delivery: {
     label: 'Delivery',
     short: 'D',
-    description: 'Auto-accept rules for delivery legs on this board.',
+    description: 'Auto-accept rules for delivery legs on this template.',
     accent: 'delivery',
   },
   movement: {
@@ -174,7 +190,7 @@ function makeMeta(
         id: `h-${createdBy.id}-1`,
         savedBy: createdBy,
         savedAt: createdAt,
-        reason: 'Initial board configuration',
+        reason: 'Initial template configuration',
       },
       ...(savedDaysAgo < createdDaysAgo
         ? [
@@ -190,7 +206,7 @@ function makeMeta(
   }
 }
 
-function defaultAutoAccept(): AutoAcceptSettings {
+function defaultAutoAccept(overrides?: Partial<AutoAcceptSettings>): AutoAcceptSettings {
   return {
     autoAccept: true,
     legs: {
@@ -225,65 +241,191 @@ function defaultAutoAccept(): AutoAcceptSettings {
         },
       }),
     },
+    ...overrides,
   }
 }
 
-function defaultCustomers(): CustomerSettings {
+function defaultCustomers(overrides?: Partial<CustomerSettings>): CustomerSettings {
   return {
     customerMode: 'exclude',
     customers: ['c-customer-c'],
+    ...overrides,
   }
 }
 
-function defaultRegions(): RegionSettings {
+function defaultRegions(overrides?: Partial<RegionSettings>): RegionSettings {
   return {
     defaultStart: ['r-detroit', 'r-midwest'],
     defaultFinish: ['r-texas', 'r-ontario'],
     allowedRegions: ['r-midwest', 'r-detroit', 'r-texas', 'r-east', 'r-ontario'],
+    ...overrides,
   }
 }
 
-function defaultNotifications(): NotificationSettings {
+function defaultNotifications(overrides?: Partial<NotificationSettings>): NotificationSettings {
   return {
     emailOnSave: true,
     emailOnAutoAccept: false,
     slackChannel: '#planning-board-ops',
     notifyRoles: ['Ops Admin', 'Dispatch Lead'],
+    ...overrides,
   }
 }
 
-export function createBoardConfigs(boardId: string): BoardConfigs {
+function settingsBundle(partial?: {
+  auto?: Partial<AutoAcceptSettings>
+  customers?: Partial<CustomerSettings>
+  regions?: Partial<RegionSettings>
+  notifications?: Partial<NotificationSettings>
+}): TemplateSettings {
+  return {
+    'auto-accept': defaultAutoAccept(partial?.auto),
+    customers: defaultCustomers(partial?.customers),
+    regions: defaultRegions(partial?.regions),
+    notifications: defaultNotifications(partial?.notifications),
+  }
+}
+
+function template(
+  id: string,
+  name: string,
+  description: string,
+  active: boolean,
+  meta: ConfigMeta,
+  settings?: Parameters<typeof settingsBundle>[0],
+): ConfigTemplate {
+  return {
+    id,
+    name,
+    description,
+    active,
+    settings: settingsBundle(settings),
+    meta,
+  }
+}
+
+export function createTemplatesForBoard(boardId: string): ConfigTemplate[] {
   const owner =
     boardId === 'alex-kawalit'
       ? USERS[1]
-      : boardId.startsWith('ab-fleet')
+      : boardId.includes('fleet') || boardId === 'power-only'
         ? USERS[2]
-        : USERS[3]
+        : boardId.includes('weekend') || boardId.includes('reefer')
+          ? USERS[4]
+          : USERS[3]
 
+  return [
+    template(
+      `${boardId}-default`,
+      'Default Rules',
+      'Standard weekday auto-accept for this board.',
+      true,
+      makeMeta(owner, USERS[2], 'Aligned lead times with board SLA', 21, 3),
+    ),
+    template(
+      `${boardId}-weekend`,
+      'Weekend Override',
+      'Expanded movement window and longer lead times for Sat/Sun.',
+      false,
+      makeMeta(USERS[2], CURRENT_USER, 'Opened weekend movement coverage', 12, 2),
+      {
+        auto: {
+          autoAccept: true,
+          legs: {
+            pickup: defaultLeg({
+              enabled: true,
+              leadTimeHours: 18,
+              timeOfDay: { start: '08:00', end: '16:00' },
+              daysAllowed: ['sat', 'sun'],
+              regions: { start: ['r-midwest'], finish: ['r-east'], intermediate: [] },
+            }),
+            delivery: defaultLeg({
+              enabled: true,
+              leadTimeHours: 14,
+              timeOfDay: { start: '08:00', end: '16:00' },
+              daysAllowed: ['sat', 'sun'],
+              regions: { start: ['r-east'], finish: ['r-midwest'], intermediate: [] },
+            }),
+            movement: defaultLeg({
+              enabled: true,
+              leadTimeHours: 6,
+              timeOfDay: { start: '00:00', end: '23:59' },
+              daysAllowed: [...ALL_WEEK],
+              regions: { start: ['r-midwest'], finish: ['r-west'], intermediate: [] },
+            }),
+          },
+        },
+        notifications: {
+          emailOnAutoAccept: true,
+          slackChannel: '#weekend-ops',
+          notifyRoles: ['Ops Admin', 'Planner'],
+        },
+      },
+    ),
+    template(
+      `${boardId}-strict`,
+      'Strict Customer Filter',
+      'Include-only mode for priority customers on this board.',
+      false,
+      makeMeta(owner, owner, 'Limited auto-accept to GLAM accounts', 9, 5),
+      {
+        auto: { autoAccept: true },
+        customers: {
+          customerMode: 'include',
+          customers: ['c-penske', 'c-stellantis', 'c-bmw'],
+        },
+        regions: {
+          defaultStart: ['r-detroit'],
+          defaultFinish: ['r-texas'],
+          allowedRegions: ['r-detroit', 'r-texas', 'r-midwest'],
+        },
+      },
+    ),
+    template(
+      `${boardId}-paused`,
+      'Paused / Manual Only',
+      'Master auto-accept off — planners ACK everything manually.',
+      false,
+      makeMeta(USERS[1], USERS[1], 'Paused auto-accept during volume spike', 4, 4),
+      {
+        auto: { autoAccept: false },
+        notifications: {
+          emailOnSave: true,
+          emailOnAutoAccept: false,
+          slackChannel: '#planning-board-ops',
+          notifyRoles: ['Board Owner', 'Dispatch Lead'],
+        },
+      },
+    ),
+  ]
+}
+
+export function createEmptyTemplate(boardId: string): ConfigTemplate {
+  const now = new Date().toISOString()
   return {
-    'auto-accept': {
-      type: 'auto-accept',
-      data: defaultAutoAccept(),
-      meta: makeMeta(owner, USERS[2], 'Aligned lead times with East Coast SLA', 21, 3),
-    },
-    customers: {
-      type: 'customers',
-      data: defaultCustomers(),
-      meta: makeMeta(owner, owner, 'Exclude Customer C from auto tendering', 18, 8),
-    },
-    regions: {
-      type: 'regions',
-      data: defaultRegions(),
-      meta: makeMeta(USERS[2], CURRENT_USER, 'Added Midwest as intermediate coverage', 14, 1),
-    },
-    notifications: {
-      type: 'notifications',
-      data: defaultNotifications(),
-      meta: makeMeta(USERS[1], USERS[1], 'Enable Slack alerts for rule changes', 10, 10),
+    id: `${boardId}-tmpl-${Date.now()}`,
+    name: 'New Template',
+    description: 'Custom configuration template for this board.',
+    active: false,
+    settings: settingsBundle(),
+    meta: {
+      createdBy: CURRENT_USER,
+      createdAt: now,
+      lastSavedBy: CURRENT_USER,
+      lastSavedAt: now,
+      reason: 'Created new configuration template',
+      history: [
+        {
+          id: `h-${Date.now()}`,
+          savedBy: CURRENT_USER,
+          savedAt: now,
+          reason: 'Created new configuration template',
+        },
+      ],
     },
   }
 }
 
-export function configTypeLabel(id: ConfigTypeId): string {
-  return CONFIG_TYPES.find((c) => c.id === id)?.label ?? id
+export function sectionLabel(id: ConfigSectionMeta['id']): string {
+  return CONFIG_SECTIONS.find((c) => c.id === id)?.label ?? id
 }

@@ -2,8 +2,10 @@ import {
   Bell,
   Check,
   Clock3,
+  Copy,
   FileText,
   MapPin,
+  Plus,
   RefreshCw,
   Search,
   Settings2,
@@ -15,21 +17,21 @@ import { useEffect, useMemo, useState } from 'react'
 import {
   ALL_DAYS,
   BOARDS,
-  CONFIG_TYPES,
+  CONFIG_SECTIONS,
   CURRENT_USER,
   CUSTOMERS,
   LEG_META,
   REGIONS,
-  configTypeLabel,
-  createBoardConfigs,
+  createEmptyTemplate,
+  createTemplatesForBoard,
+  sectionLabel,
 } from './data/seed'
 import type {
   AutoAcceptSettings,
-  BoardConfigs,
   ConfigHistoryEntry,
   ConfigMeta,
-  ConfigPayloadMap,
-  ConfigTypeId,
+  ConfigSectionId,
+  ConfigTemplate,
   CustomerMode,
   CustomerSettings,
   DayKey,
@@ -37,10 +39,9 @@ import type {
   NotificationSettings,
   RegionRule,
   RegionSettings,
+  TemplateSettings,
   UserRef,
 } from './types'
-
-type AnySettings = ConfigPayloadMap[ConfigTypeId]
 
 const LEG_TYPES: LegType[] = ['pickup', 'delivery', 'movement']
 
@@ -265,27 +266,29 @@ function HistoryList({ entries }: { entries: ConfigHistoryEntry[] }) {
 
 export default function App() {
   const [boardId, setBoardId] = useState(BOARDS[0].id)
-  const [configType, setConfigType] = useState<ConfigTypeId>('auto-accept')
-  const [store, setStore] = useState<Record<string, BoardConfigs>>(() => ({
-    [BOARDS[0].id]: createBoardConfigs(BOARDS[0].id),
+  const [store, setStore] = useState<Record<string, ConfigTemplate[]>>(() => ({
+    [BOARDS[0].id]: createTemplatesForBoard(BOARDS[0].id),
   }))
-  const [draft, setDraft] = useState<AnySettings>(() =>
-    clone(createBoardConfigs(BOARDS[0].id)['auto-accept'].data),
-  )
-  const [draftMeta, setDraftMeta] = useState<ConfigMeta>(
-    () => clone(createBoardConfigs(BOARDS[0].id)['auto-accept'].meta),
+  const [templateId, setTemplateId] = useState(() => createTemplatesForBoard(BOARDS[0].id)[0].id)
+  const [section, setSection] = useState<ConfigSectionId>('auto-accept')
+  const [draft, setDraft] = useState<ConfigTemplate>(() =>
+    clone(createTemplatesForBoard(BOARDS[0].id)[0]),
   )
   const [saveReason, setSaveReason] = useState('')
   const [activeLeg, setActiveLeg] = useState<LegType>('pickup')
   const [boardQuery, setBoardQuery] = useState('')
+  const [templateQuery, setTemplateQuery] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
   const [toast, setToast] = useState<string | null>(null)
 
   const board = BOARDS.find((b) => b.id === boardId) ?? BOARDS[0]
-  const boardConfigs = store[boardId] ?? createBoardConfigs(boardId)
-  const savedBundle = boardConfigs[configType]
-  const dirty = !equal(draft, savedBundle.data)
-  const typeMeta = CONFIG_TYPES.find((c) => c.id === configType)!
+  const templates = store[boardId] ?? createTemplatesForBoard(boardId)
+  const savedTemplate = templates.find((t) => t.id === templateId) ?? templates[0]
+  const settingsDirty = !equal(draft.settings, savedTemplate.settings)
+  const identityDirty =
+    draft.name !== savedTemplate.name || draft.description !== savedTemplate.description
+  const dirty = settingsDirty || identityDirty || draft.active !== savedTemplate.active
+  const sectionMeta = CONFIG_SECTIONS.find((c) => c.id === section)!
 
   useEffect(() => {
     if (!toast) return
@@ -293,39 +296,41 @@ export default function App() {
     return () => window.clearTimeout(t)
   }, [toast])
 
-  function ensureBoard(id: string): BoardConfigs {
+  function ensureBoard(id: string): ConfigTemplate[] {
     if (store[id]) return store[id]
-    const created = createBoardConfigs(id)
+    const created = createTemplatesForBoard(id)
     setStore((prev) => ({ ...prev, [id]: created }))
     return created
   }
 
-  function loadBundle(nextBoardId: string, nextType: ConfigTypeId) {
-    const configs = ensureBoard(nextBoardId)
-    const bundle = configs[nextType]
-    setDraft(clone(bundle.data))
-    setDraftMeta(clone(bundle.meta))
+  function loadTemplate(nextBoardId: string, nextTemplateId: string) {
+    const list = ensureBoard(nextBoardId)
+    const tmpl = list.find((t) => t.id === nextTemplateId) ?? list[0]
+    setTemplateId(tmpl.id)
+    setDraft(clone(tmpl))
     setSaveReason('')
+    setSection('auto-accept')
     setActiveLeg('pickup')
     setCustomerQuery('')
+    setTemplateQuery('')
   }
 
   function switchBoard(id: string) {
     if (id === boardId) return
-    if (dirty && !window.confirm('Discard unsaved changes for this configuration?')) return
+    if (dirty && !window.confirm('Discard unsaved changes for this template?')) return
+    const list = ensureBoard(id)
     setBoardId(id)
-    loadBundle(id, configType)
+    loadTemplate(id, list[0].id)
   }
 
-  function switchConfigType(id: ConfigTypeId) {
-    if (id === configType) return
-    if (dirty && !window.confirm('Discard unsaved changes for this configuration?')) return
-    setConfigType(id)
-    loadBundle(boardId, id)
+  function switchTemplate(id: string) {
+    if (id === templateId) return
+    if (dirty && !window.confirm('Discard unsaved changes for this template?')) return
+    loadTemplate(boardId, id)
   }
 
   function reset() {
-    setDraft(clone(savedBundle.data))
+    setDraft(clone(savedTemplate))
     setSaveReason('')
     setToast('Changes discarded')
   }
@@ -345,38 +350,110 @@ export default function App() {
       savedAt: now,
       reason,
     }
-
     const nextMeta: ConfigMeta = {
-      ...draftMeta,
+      ...draft.meta,
       lastSavedBy: CURRENT_USER,
       lastSavedAt: now,
       reason,
-      history: [...draftMeta.history, historyEntry],
+      history: [...draft.meta.history, historyEntry],
+    }
+    const nextTemplate: ConfigTemplate = {
+      ...draft,
+      meta: nextMeta,
     }
 
     setStore((prev) => {
-      const current = prev[boardId] ?? createBoardConfigs(boardId)
+      const list = prev[boardId] ?? createTemplatesForBoard(boardId)
       return {
         ...prev,
-        [boardId]: {
-          ...current,
-          [configType]: {
-            ...current[configType],
-            data: clone(draft) as never,
-            meta: nextMeta,
-          },
-        },
+        [boardId]: list.map((t) => {
+          if (t.id !== nextTemplate.id) {
+            return nextTemplate.active ? { ...t, active: false } : t
+          }
+          return nextTemplate
+        }),
       }
     })
-    setDraftMeta(nextMeta)
+    setDraft(nextTemplate)
     setSaveReason('')
-    setToast(`Saved ${configTypeLabel(configType)} for ${board.shortName}`)
+    setToast(`Saved “${nextTemplate.name}” for ${board.shortName}`)
+  }
+
+  function addTemplate() {
+    if (dirty && !window.confirm('Discard unsaved changes for this template?')) return
+    const created = createEmptyTemplate(boardId)
+    setStore((prev) => ({
+      ...prev,
+      [boardId]: [...(prev[boardId] ?? createTemplatesForBoard(boardId)), created],
+    }))
+    setTemplateId(created.id)
+    setDraft(clone(created))
+    setSaveReason('')
+    setSection('auto-accept')
+    setToast('New template created — edit settings and save')
+  }
+
+  function duplicateTemplate() {
+    if (dirty && !window.confirm('Discard unsaved changes for this template?')) return
+    const copy: ConfigTemplate = {
+      ...clone(savedTemplate),
+      id: `${boardId}-tmpl-${Date.now()}`,
+      name: `${savedTemplate.name} Copy`,
+      active: false,
+      meta: {
+        ...clone(savedTemplate.meta),
+        createdBy: CURRENT_USER,
+        createdAt: new Date().toISOString(),
+        lastSavedBy: CURRENT_USER,
+        lastSavedAt: new Date().toISOString(),
+        reason: `Duplicated from ${savedTemplate.name}`,
+        history: [
+          {
+            id: `h-${Date.now()}`,
+            savedBy: CURRENT_USER,
+            savedAt: new Date().toISOString(),
+            reason: `Duplicated from ${savedTemplate.name}`,
+          },
+        ],
+      },
+    }
+    setStore((prev) => ({
+      ...prev,
+      [boardId]: [...(prev[boardId] ?? createTemplatesForBoard(boardId)), copy],
+    }))
+    setTemplateId(copy.id)
+    setDraft(clone(copy))
+    setSaveReason('')
+    setToast(`Duplicated “${savedTemplate.name}”`)
+  }
+
+  function updateSettings<K extends keyof TemplateSettings>(
+    key: K,
+    updater: (prev: TemplateSettings[K]) => TemplateSettings[K],
+  ) {
+    setDraft((prev) => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        [key]: updater(prev.settings[key]),
+      },
+    }))
   }
 
   const filteredBoards = BOARDS.filter((b) => {
     const q = boardQuery.trim().toLowerCase()
     if (!q) return true
-    return b.name.toLowerCase().includes(q) || b.shortName.toLowerCase().includes(q)
+    return (
+      b.name.toLowerCase().includes(q) ||
+      b.shortName.toLowerCase().includes(q) ||
+      b.region.toLowerCase().includes(q)
+    )
+  })
+
+  const filteredTemplates = templates.filter((t) => {
+    const q = templateQuery.trim().toLowerCase()
+    if (!q) return true
+    return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
   })
 
   const regionOptions = REGIONS.map((r) => ({
@@ -432,8 +509,65 @@ export default function App() {
                   onClick={() => switchBoard(b.id)}
                   title={b.name}
                 >
-                  <span className="board-list-name">{b.shortName}</span>
+                  <span className="board-list-main">
+                    <span className="board-list-name">{b.shortName}</span>
+                    <span className="board-list-region">{b.region}</span>
+                  </span>
                   <span className="board-list-count">{b.legCount}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </aside>
+
+        <aside className="template-sidebar" aria-label="Configuration templates">
+          <div className="template-head">
+            <div>
+              <p className="template-eyebrow">Selected board</p>
+              <h2>{board.shortName}</h2>
+            </div>
+            <span className="template-count">{templates.length}</span>
+          </div>
+          <p className="template-sub">Configuration templates — switch, edit, and save separately.</p>
+
+          <div className="template-toolbar">
+            <div className="sidebar-search light">
+              <Search size={13} />
+              <input
+                value={templateQuery}
+                onChange={(e) => setTemplateQuery(e.target.value)}
+                placeholder="Search templates…"
+              />
+            </div>
+            <button type="button" className="icon-btn light" onClick={addTemplate} title="New template">
+              <Plus size={15} />
+            </button>
+            <button
+              type="button"
+              className="icon-btn light"
+              onClick={duplicateTemplate}
+              title="Duplicate selected"
+            >
+              <Copy size={14} />
+            </button>
+          </div>
+
+          <ul className="template-list">
+            {filteredTemplates.map((t) => (
+              <li key={t.id}>
+                <button
+                  type="button"
+                  className={t.id === templateId ? 'is-active' : ''}
+                  onClick={() => switchTemplate(t.id)}
+                >
+                  <span className="template-row-top">
+                    <strong>{t.name}</strong>
+                    {t.active && <span className="active-pill">Active</span>}
+                  </span>
+                  <span className="template-row-desc">{t.description}</span>
+                  <span className="template-row-meta">
+                    {t.meta.lastSavedBy.initials} · {formatWhen(t.meta.lastSavedAt)}
+                  </span>
                 </button>
               </li>
             ))}
@@ -443,14 +577,20 @@ export default function App() {
         <main className="main-pane">
           <div className="page-header">
             <div>
-              <p className="eyebrow">Team-specific · Board configuration</p>
-              <h2>{board.name}</h2>
-              <p className="page-sub">
-                Manage multiple saved configuration types for this planning board.
-              </p>
+              <p className="eyebrow">Configuration template</p>
+              <h2>{draft.name}</h2>
+              <p className="page-sub">{draft.description}</p>
             </div>
             <div className="page-actions">
-              {dirty && <span className="dirty-pill">Unsaved changes</span>}
+              {dirty && (
+                <span className="dirty-pill">
+                  {settingsDirty && identityDirty
+                    ? '2 changes'
+                    : settingsDirty
+                      ? 'Settings changed'
+                      : 'Details changed'}
+                </span>
+              )}
               <button type="button" className="btn ghost" disabled={!dirty} onClick={reset}>
                 Discard
               </button>
@@ -460,71 +600,100 @@ export default function App() {
                 disabled={!dirty || !saveReason.trim()}
                 onClick={save}
               >
-                Save configuration
+                Save template
               </button>
             </div>
           </div>
 
-          <div className="config-type-bar" role="tablist" aria-label="Configuration types">
-            {CONFIG_TYPES.map((type) => {
+          <div className="template-identity panel">
+            <label className="field">
+              <span className="field-label">Template name</span>
+              <input
+                className="text-input"
+                value={draft.name}
+                onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
+              />
+            </label>
+            <label className="field">
+              <span className="field-label">Description</span>
+              <input
+                className="text-input"
+                value={draft.description}
+                onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
+              />
+            </label>
+            <div className="field-row between active-row">
+              <div>
+                <h4>Active on this board</h4>
+                <p className="field-help">Only one template can be active per board.</p>
+              </div>
+              <Toggle
+                checked={draft.active}
+                onChange={(active) => setDraft((prev) => ({ ...prev, active }))}
+              />
+            </div>
+          </div>
+
+          <div className="config-type-bar" role="tablist" aria-label="Template settings">
+            {CONFIG_SECTIONS.map((item) => {
               const Icon =
-                type.id === 'auto-accept'
+                item.id === 'auto-accept'
                   ? ShieldCheck
-                  : type.id === 'customers'
+                  : item.id === 'customers'
                     ? Users
-                    : type.id === 'regions'
+                    : item.id === 'regions'
                       ? MapPin
                       : Bell
               return (
                 <button
-                  key={type.id}
+                  key={item.id}
                   type="button"
                   role="tab"
-                  aria-selected={configType === type.id}
-                  className={configType === type.id ? 'is-active' : ''}
-                  onClick={() => switchConfigType(type.id)}
+                  aria-selected={section === item.id}
+                  className={section === item.id ? 'is-active' : ''}
+                  onClick={() => setSection(item.id)}
                 >
                   <Icon size={14} />
-                  {type.label}
+                  {item.label}
                 </button>
               )
             })}
           </div>
 
-          <p className="type-blurb">{typeMeta.description}</p>
+          <p className="type-blurb">
+            {sectionMeta.description} Each template keeps its own {sectionLabel(section).toLowerCase()}{' '}
+            settings.
+          </p>
 
           <div className="center-scroll">
-            {configType === 'auto-accept' && (
+            {section === 'auto-accept' && (
               <AutoAcceptEditor
-                draft={draft as AutoAcceptSettings}
-                setDraft={(fn) => setDraft((prev) => fn(prev as AutoAcceptSettings))}
+                draft={draft.settings['auto-accept']}
+                setDraft={(fn) => updateSettings('auto-accept', fn)}
                 activeLeg={activeLeg}
                 setActiveLeg={setActiveLeg}
                 regionOptions={regionOptions}
               />
             )}
-
-            {configType === 'customers' && (
+            {section === 'customers' && (
               <CustomersEditor
-                draft={draft as CustomerSettings}
-                setDraft={(fn) => setDraft((prev) => fn(prev as CustomerSettings))}
+                draft={draft.settings.customers}
+                setDraft={(fn) => updateSettings('customers', fn)}
                 customerQuery={customerQuery}
                 setCustomerQuery={setCustomerQuery}
               />
             )}
-
-            {configType === 'regions' && (
+            {section === 'regions' && (
               <RegionsEditor
-                draft={draft as RegionSettings}
-                setDraft={(fn) => setDraft((prev) => fn(prev as RegionSettings))}
+                draft={draft.settings.regions}
+                setDraft={(fn) => updateSettings('regions', fn)}
                 regionOptions={regionOptions}
               />
             )}
-
-            {configType === 'notifications' && (
+            {section === 'notifications' && (
               <NotificationsEditor
-                draft={draft as NotificationSettings}
-                setDraft={(fn) => setDraft((prev) => fn(prev as NotificationSettings))}
+                draft={draft.settings.notifications}
+                setDraft={(fn) => updateSettings('notifications', fn)}
               />
             )}
           </div>
@@ -542,7 +711,7 @@ export default function App() {
               <textarea
                 value={saveReason}
                 onChange={(e) => setSaveReason(e.target.value)}
-                placeholder="Why are you changing this configuration?"
+                placeholder="Why are you changing this template?"
                 rows={3}
               />
               <em>Required before saving. Stored with your user details.</em>
@@ -550,16 +719,16 @@ export default function App() {
 
             <div className="meta-divider" />
 
-            <UserCard user={draftMeta.createdBy} label="Created by" when={draftMeta.createdAt} />
+            <UserCard user={draft.meta.createdBy} label="Created by" when={draft.meta.createdAt} />
             <UserCard
-              user={draftMeta.lastSavedBy}
+              user={draft.meta.lastSavedBy}
               label="Last saved by"
-              when={draftMeta.lastSavedAt}
+              when={draft.meta.lastSavedAt}
             />
 
             <div className="current-reason">
               <p className="user-label">Last save reason</p>
-              <p className="reason-text">{draftMeta.reason || '—'}</p>
+              <p className="reason-text">{draft.meta.reason || '—'}</p>
             </div>
 
             <div className="saving-as">
@@ -581,7 +750,7 @@ export default function App() {
               <Clock3 size={15} />
               <h3>Save history</h3>
             </div>
-            <HistoryList entries={draftMeta.history} />
+            <HistoryList entries={draft.meta.history} />
           </div>
         </aside>
       </div>
@@ -633,7 +802,7 @@ function AutoAcceptEditor({
           <div className="master-badge">{draft.autoAccept ? 'ON' : 'OFF'}</div>
           <div>
             <h3>Auto Accept</h3>
-            <p>Master toggle for this board. When off, all per-leg rules are ignored.</p>
+            <p>Master toggle for this template. When off, all per-leg rules are ignored.</p>
           </div>
         </div>
         <Toggle
@@ -716,9 +885,6 @@ function AutoAcceptEditor({
 
             <div className="field">
               <span className="field-label">Time of day window</span>
-              <span className="field-help">
-                Auto-accept only when the scheduled time falls in this window.
-              </span>
               <div className="time-row">
                 <label>
                   Start
@@ -748,9 +914,6 @@ function AutoAcceptEditor({
 
             <div className="field">
               <span className="field-label">Days allowed</span>
-              <span className="field-help">
-                Select which days of the week this leg type may auto-accept.
-              </span>
               <DayPicker
                 value={leg.daysAllowed}
                 disabled={!leg.enabled || masterOff}
@@ -763,9 +926,6 @@ function AutoAcceptEditor({
                 <MapPin size={14} />
                 <span className="field-label">Regions</span>
               </div>
-              <span className="field-help">
-                Match start, finish, and optional intermediate stop regions for this leg type.
-              </span>
               <div className="region-grid">
                 <label>
                   Start
@@ -824,7 +984,7 @@ function CustomersEditor({
     <section className="panel editor-panel">
       <div className="panel-body">
         <h3>Customer include / exclude</h3>
-        <p className="field-help">Scope this board configuration to specific customers.</p>
+        <p className="field-help">Scope this template to specific customers.</p>
 
         <div className="mode-toggle" role="group" aria-label="Customer filter mode">
           {(['include', 'exclude'] as CustomerMode[]).map((mode) => (
@@ -873,11 +1033,6 @@ function CustomersEditor({
               )
             })}
           </ul>
-          <p className="customer-summary">
-            {draft.customerMode === 'exclude' ? 'Excluding' : 'Including'}{' '}
-            <strong>{draft.customers.length}</strong> customer
-            {draft.customers.length === 1 ? '' : 's'}
-          </p>
         </div>
       </div>
     </section>
@@ -896,10 +1051,7 @@ function RegionsEditor({
   return (
     <section className="panel editor-panel">
       <div className="panel-body">
-        <h3>Board region defaults</h3>
-        <p className="field-help">
-          Configure default and allowed regions used across this planning board.
-        </p>
+        <h3>Template region defaults</h3>
         <div className="region-grid">
           <label>
             Default start regions
@@ -947,13 +1099,11 @@ function NotificationsEditor({
     <section className="panel editor-panel">
       <div className="panel-body">
         <h3>Notification preferences</h3>
-        <p className="field-help">Choose how the team is notified when this board config changes.</p>
-
         <div className="notify-rows">
           <div className="field-row between">
             <div>
               <h4>Email on save</h4>
-              <p className="field-help">Notify watchers when this configuration is saved.</p>
+              <p className="field-help">Notify watchers when this template is saved.</p>
             </div>
             <Toggle
               checked={draft.emailOnSave}
