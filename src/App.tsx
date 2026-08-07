@@ -1,9 +1,7 @@
 import {
   Bell,
   Check,
-  Clock3,
   Copy,
-  FileText,
   MapPin,
   Plus,
   RefreshCw,
@@ -223,44 +221,18 @@ function DayPicker({
   )
 }
 
-function UserCard({ user, label, when }: { user: UserRef; label: string; when?: string }) {
+function UserLine({ user, label, when }: { user: UserRef; label: string; when?: string }) {
   return (
-    <div className="user-card">
-      <div className="user-avatar" aria-hidden>
+    <div className="user-line">
+      <span className="user-avatar" aria-hidden>
         {user.initials}
-      </div>
+      </span>
       <div className="user-copy">
         <p className="user-label">{label}</p>
         <p className="user-name">{user.name}</p>
-        <p className="user-meta">
-          {user.role} · {user.email}
-        </p>
-        {when && (
-          <p className="user-when">
-            <Clock3 size={12} />
-            {formatWhen(when)}
-          </p>
-        )}
+        {when && <p className="user-when">{formatWhen(when)}</p>}
       </div>
     </div>
-  )
-}
-
-function HistoryList({ entries }: { entries: ConfigHistoryEntry[] }) {
-  const sorted = [...entries].sort((a, b) => +new Date(b.savedAt) - +new Date(a.savedAt))
-  return (
-    <ul className="history-list">
-      {sorted.slice(0, 5).map((entry) => (
-        <li key={entry.id}>
-          <div className="history-avatar">{entry.savedBy.initials}</div>
-          <div>
-            <p className="history-name">{entry.savedBy.name}</p>
-            <p className="history-reason">{entry.reason}</p>
-            <p className="history-when">{formatWhen(entry.savedAt)}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
   )
 }
 
@@ -698,11 +670,6 @@ export default function App() {
 
         <aside className="meta-sidebar" aria-label="Configuration details">
           <div className="meta-card">
-            <div className="meta-card-head">
-              <FileText size={15} />
-              <h3>Save details</h3>
-            </div>
-
             <label className="reason-field">
               <span>Reason for this save</span>
               <textarea
@@ -711,43 +678,24 @@ export default function App() {
                 placeholder="Why are you changing this template?"
                 rows={3}
               />
-              <em>Required before saving. Stored with your user details.</em>
             </label>
 
-            <div className="meta-divider" />
-
-            <UserCard user={draft.meta.createdBy} label="Created by" when={draft.meta.createdAt} />
-            <UserCard
-              user={draft.meta.lastSavedBy}
-              label="Last saved by"
-              when={draft.meta.lastSavedAt}
-            />
-
-            <div className="current-reason">
-              <p className="user-label">Last save reason</p>
-              <p className="reason-text">{draft.meta.reason || '—'}</p>
+            <div className="meta-people">
+              <UserLine user={draft.meta.createdBy} label="Created by" when={draft.meta.createdAt} />
+              <UserLine
+                user={draft.meta.lastSavedBy}
+                label="Last saved by"
+                when={draft.meta.lastSavedAt}
+              />
+              <UserLine user={CURRENT_USER} label="Saving as" />
             </div>
 
-            <div className="saving-as">
-              <p className="user-label">Saving as</p>
-              <div className="saving-as-row">
-                <span className="user-avatar sm">{CURRENT_USER.initials}</span>
-                <div>
-                  <strong>{CURRENT_USER.name}</strong>
-                  <span>
-                    {CURRENT_USER.role} · {CURRENT_USER.email}
-                  </span>
-                </div>
+            {draft.meta.reason && (
+              <div className="current-reason">
+                <p className="user-label">Last reason</p>
+                <p className="reason-text">{draft.meta.reason}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="meta-card">
-            <div className="meta-card-head">
-              <Clock3 size={15} />
-              <h3>Save history</h3>
-            </div>
-            <HistoryList entries={draft.meta.history} />
+            )}
           </div>
         </aside>
       </div>
