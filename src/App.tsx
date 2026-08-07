@@ -285,8 +285,7 @@ export default function App() {
   const templates = store[boardId] ?? createTemplatesForBoard(boardId)
   const savedTemplate = templates.find((t) => t.id === templateId) ?? templates[0]
   const settingsDirty = !equal(draft.settings, savedTemplate.settings)
-  const identityDirty =
-    draft.name !== savedTemplate.name || draft.description !== savedTemplate.description
+  const identityDirty = draft.name !== savedTemplate.name
   const dirty = settingsDirty || identityDirty || draft.active !== savedTemplate.active
   const sectionMeta = CONFIG_SECTIONS.find((c) => c.id === section)!
 
@@ -440,6 +439,16 @@ export default function App() {
     }))
   }
 
+  function formatCreated(iso: string): string {
+    return new Date(iso).toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  }
+
   const filteredBoards = BOARDS.filter((b) => {
     const q = boardQuery.trim().toLowerCase()
     if (!q) return true
@@ -453,7 +462,7 @@ export default function App() {
   const filteredTemplates = templates.filter((t) => {
     const q = templateQuery.trim().toLowerCase()
     if (!q) return true
-    return t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q)
+    return t.name.toLowerCase().includes(q)
   })
 
   const regionOptions = REGIONS.map((r) => ({
@@ -487,91 +496,95 @@ export default function App() {
       </header>
 
       <div className="shell">
-        <aside className="board-sidebar" aria-label="Planning boards">
-          <div className="sidebar-head">
-            <p>Boards</p>
-            <span>{BOARDS.length}</span>
-          </div>
-          <div className="sidebar-search">
-            <Search size={13} />
-            <input
-              value={boardQuery}
-              onChange={(e) => setBoardQuery(e.target.value)}
-              placeholder="Search boards…"
-            />
-          </div>
-          <ul className="board-list">
-            {filteredBoards.map((b) => (
-              <li key={b.id}>
-                <button
-                  type="button"
-                  className={b.id === boardId ? 'is-active' : ''}
-                  onClick={() => switchBoard(b.id)}
-                  title={b.name}
-                >
-                  <span className="board-list-main">
-                    <span className="board-list-name">{b.shortName}</span>
-                    <span className="board-list-region">{b.region}</span>
-                  </span>
-                  <span className="board-list-count">{b.legCount}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        <aside className="template-sidebar" aria-label="Configuration templates">
-          <div className="template-head">
-            <div>
-              <p className="template-eyebrow">Selected board</p>
-              <h2>{board.shortName}</h2>
+        <aside className="rail board-rail" aria-label="Planning boards">
+          <div className="rail-section">
+            <div className="rail-section-head">
+              <h2>Boards</h2>
+              <span>{BOARDS.length}</span>
             </div>
-            <span className="template-count">{templates.length}</span>
-          </div>
-          <p className="template-sub">Configuration templates — switch, edit, and save separately.</p>
-
-          <div className="template-toolbar">
-            <div className="sidebar-search light">
+            <div className="rail-search">
               <Search size={13} />
               <input
-                value={templateQuery}
-                onChange={(e) => setTemplateQuery(e.target.value)}
-                placeholder="Search templates…"
+                value={boardQuery}
+                onChange={(e) => setBoardQuery(e.target.value)}
+                placeholder="Search…"
               />
             </div>
-            <button type="button" className="icon-btn light" onClick={addTemplate} title="New template">
-              <Plus size={15} />
-            </button>
-            <button
-              type="button"
-              className="icon-btn light"
-              onClick={duplicateTemplate}
-              title="Duplicate selected"
-            >
-              <Copy size={14} />
-            </button>
+            <ul className="rail-list">
+              {filteredBoards.map((b) => (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    className={b.id === boardId ? 'is-active' : ''}
+                    onClick={() => switchBoard(b.id)}
+                    title={b.name}
+                  >
+                    <span className="rail-row-top">
+                      <strong>{b.shortName}</strong>
+                      <span className="rail-count">{b.legCount}</span>
+                    </span>
+                    <span className="rail-row-meta">{b.region}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           </div>
+        </aside>
 
-          <ul className="template-list">
-            {filteredTemplates.map((t) => (
-              <li key={t.id}>
-                <button
-                  type="button"
-                  className={t.id === templateId ? 'is-active' : ''}
-                  onClick={() => switchTemplate(t.id)}
-                >
-                  <span className="template-row-top">
-                    <strong>{t.name}</strong>
-                    {t.active && <span className="active-pill">Active</span>}
-                  </span>
-                  <span className="template-row-desc">{t.description}</span>
-                  <span className="template-row-meta">
-                    {t.meta.lastSavedBy.initials} · {formatWhen(t.meta.lastSavedAt)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
+        <aside className="rail template-rail" aria-label="Configuration templates">
+          <div className="rail-section">
+            <div className="rail-section-head">
+              <div>
+                <p className="rail-kicker">Selected board</p>
+                <h2>{board.shortName}</h2>
+              </div>
+              <span>{templates.length}</span>
+            </div>
+
+            <div className="rail-toolbar">
+              <div className="rail-search light">
+                <Search size={13} />
+                <input
+                  value={templateQuery}
+                  onChange={(e) => setTemplateQuery(e.target.value)}
+                  placeholder="Search…"
+                />
+              </div>
+              <button type="button" className="rail-icon-btn" onClick={addTemplate} title="New template">
+                <Plus size={15} />
+              </button>
+              <button
+                type="button"
+                className="rail-icon-btn"
+                onClick={duplicateTemplate}
+                title="Duplicate selected"
+              >
+                <Copy size={14} />
+              </button>
+            </div>
+
+            <ul className="rail-list">
+              {filteredTemplates.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    className={t.id === templateId ? 'is-active' : ''}
+                    onClick={() => switchTemplate(t.id)}
+                  >
+                    <span className="rail-row-top">
+                      <strong>{t.name}</strong>
+                      {t.active ? (
+                        <span className="status-pill is-active">Active</span>
+                      ) : (
+                        <span className="status-pill">Inactive</span>
+                      )}
+                    </span>
+                    <span className="rail-row-meta">{formatCreated(t.meta.createdAt)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
         </aside>
 
         <main className="main-pane">
@@ -579,7 +592,6 @@ export default function App() {
             <div>
               <p className="eyebrow">Configuration template</p>
               <h2>{draft.name}</h2>
-              <p className="page-sub">{draft.description}</p>
             </div>
             <div className="page-actions">
               {dirty && (
@@ -612,14 +624,6 @@ export default function App() {
                 className="text-input"
                 value={draft.name}
                 onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
-              />
-            </label>
-            <label className="field">
-              <span className="field-label">Description</span>
-              <input
-                className="text-input"
-                value={draft.description}
-                onChange={(e) => setDraft((prev) => ({ ...prev, description: e.target.value }))}
               />
             </label>
             <div className="field-row between active-row">
