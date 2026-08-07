@@ -1,18 +1,82 @@
 import type {
-  BoardConfig,
+  AutoAcceptSettings,
+  BoardConfigs,
   BoardMeta,
+  ConfigMeta,
+  ConfigTypeId,
+  ConfigTypeMeta,
   CustomerOption,
+  CustomerSettings,
   DayKey,
   LegTypeConfig,
+  NotificationSettings,
   RegionOption,
+  RegionSettings,
+  UserRef,
 } from '../types'
 
+export const CURRENT_USER: UserRef = {
+  id: 'u-sd',
+  name: 'Sukhdeep Dhillon',
+  email: 'sukhdeep@chargerlogistics.com',
+  role: 'Ops Admin',
+  initials: 'SD',
+}
+
+export const USERS: UserRef[] = [
+  CURRENT_USER,
+  {
+    id: 'u-ak',
+    name: 'Alex Kawalit',
+    email: 'alex.kawalit@chargerlogistics.com',
+    role: 'Board Owner',
+    initials: 'AK',
+  },
+  {
+    id: 'u-jm',
+    name: 'Jessica Martin',
+    email: 'jessica.martin@chargerlogistics.com',
+    role: 'Dispatch Lead',
+    initials: 'JM',
+  },
+  {
+    id: 'u-rt',
+    name: 'Ryan Torres',
+    email: 'ryan.torres@chargerlogistics.com',
+    role: 'Planner',
+    initials: 'RT',
+  },
+]
+
 export const BOARDS: BoardMeta[] = [
-  { id: 'ab-cdn-east', name: 'AB CDN East Coast Inbound', shortName: 'AB CDN East Coast In…' },
-  { id: 'ab-cdn-west', name: 'AB CDN West Coast Inbound', shortName: 'AB CDN West Coast In…' },
-  { id: 'ab-fleet-in', name: 'AB Fleet Inbound', shortName: 'AB Fleet Inbound' },
-  { id: 'ab-fleet-out', name: 'AB Fleet Outbound', shortName: 'AB Fleet Outbound' },
-  { id: 'alex-kawalit', name: 'Alex Kawalit Board', shortName: 'Alex Kawalit Board' },
+  { id: 'ab-cdn-east', name: 'AB CDN East Coast Inbound', shortName: 'AB CDN East In', legCount: 63 },
+  { id: 'ab-cdn-west', name: 'AB CDN West Coast Inbound', shortName: 'AB CDN West In', legCount: 41 },
+  { id: 'ab-fleet-in', name: 'AB Fleet Inbound', shortName: 'AB Fleet In', legCount: 28 },
+  { id: 'ab-fleet-out', name: 'AB Fleet Outbound', shortName: 'AB Fleet Out', legCount: 34 },
+  { id: 'alex-kawalit', name: 'Alex Kawalit Board', shortName: 'Alex Kawalit', legCount: 19 },
+]
+
+export const CONFIG_TYPES: ConfigTypeMeta[] = [
+  {
+    id: 'auto-accept',
+    label: 'Auto Accept',
+    description: 'Lead time, time windows, days, and per-leg toggles.',
+  },
+  {
+    id: 'customers',
+    label: 'Customers',
+    description: 'Include or exclude customers for this board.',
+  },
+  {
+    id: 'regions',
+    label: 'Regions',
+    description: 'Default start, finish, and allowed coverage regions.',
+  },
+  {
+    id: 'notifications',
+    label: 'Notifications',
+    description: 'Email and Slack alerts when rules fire or change.',
+  },
 ]
 
 export const CUSTOMERS: CustomerOption[] = [
@@ -48,6 +112,27 @@ export const ALL_DAYS: { key: DayKey; label: string }[] = [
   { key: 'sun', label: 'Sun' },
 ]
 
+export const LEG_META = {
+  pickup: {
+    label: 'Pickup',
+    short: 'P',
+    description: 'Auto-accept rules for pickup legs on this board.',
+    accent: 'pickup',
+  },
+  delivery: {
+    label: 'Delivery',
+    short: 'D',
+    description: 'Auto-accept rules for delivery legs on this board.',
+    accent: 'delivery',
+  },
+  movement: {
+    label: 'Movement',
+    short: 'M',
+    description: 'Auto-accept rules for empty / reposition movement legs.',
+    accent: 'movement',
+  },
+} as const
+
 const WEEKDAYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri']
 const ALL_WEEK: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
@@ -62,12 +147,52 @@ function defaultLeg(partial?: Partial<LegTypeConfig>): LegTypeConfig {
   }
 }
 
-export function createDefaultConfig(boardId: string): BoardConfig {
+function isoDaysAgo(days: number, hour = 10): string {
+  const d = new Date()
+  d.setDate(d.getDate() - days)
+  d.setHours(hour, 15, 0, 0)
+  return d.toISOString()
+}
+
+function makeMeta(
+  createdBy: UserRef,
+  lastSavedBy: UserRef,
+  reason: string,
+  createdDaysAgo: number,
+  savedDaysAgo: number,
+): ConfigMeta {
+  const createdAt = isoDaysAgo(createdDaysAgo, 9)
+  const lastSavedAt = isoDaysAgo(savedDaysAgo, 14)
   return {
-    boardId,
+    createdBy,
+    createdAt,
+    lastSavedBy,
+    lastSavedAt,
+    reason,
+    history: [
+      {
+        id: `h-${createdBy.id}-1`,
+        savedBy: createdBy,
+        savedAt: createdAt,
+        reason: 'Initial board configuration',
+      },
+      ...(savedDaysAgo < createdDaysAgo
+        ? [
+            {
+              id: `h-${lastSavedBy.id}-2`,
+              savedBy: lastSavedBy,
+              savedAt: lastSavedAt,
+              reason,
+            },
+          ]
+        : []),
+    ],
+  }
+}
+
+function defaultAutoAccept(): AutoAcceptSettings {
+  return {
     autoAccept: true,
-    customerMode: 'exclude',
-    customers: ['c-customer-c'],
     legs: {
       pickup: defaultLeg({
         leadTimeHours: 12,
@@ -103,23 +228,62 @@ export function createDefaultConfig(boardId: string): BoardConfig {
   }
 }
 
-export const LEG_META = {
-  pickup: {
-    label: 'Pickup',
-    short: 'P',
-    description: 'Auto-accept rules for pickup legs on this board.',
-    accent: 'pickup',
-  },
-  delivery: {
-    label: 'Delivery',
-    short: 'D',
-    description: 'Auto-accept rules for delivery legs on this board.',
-    accent: 'delivery',
-  },
-  movement: {
-    label: 'Movement',
-    short: 'M',
-    description: 'Auto-accept rules for empty / reposition movement legs.',
-    accent: 'movement',
-  },
-} as const
+function defaultCustomers(): CustomerSettings {
+  return {
+    customerMode: 'exclude',
+    customers: ['c-customer-c'],
+  }
+}
+
+function defaultRegions(): RegionSettings {
+  return {
+    defaultStart: ['r-detroit', 'r-midwest'],
+    defaultFinish: ['r-texas', 'r-ontario'],
+    allowedRegions: ['r-midwest', 'r-detroit', 'r-texas', 'r-east', 'r-ontario'],
+  }
+}
+
+function defaultNotifications(): NotificationSettings {
+  return {
+    emailOnSave: true,
+    emailOnAutoAccept: false,
+    slackChannel: '#planning-board-ops',
+    notifyRoles: ['Ops Admin', 'Dispatch Lead'],
+  }
+}
+
+export function createBoardConfigs(boardId: string): BoardConfigs {
+  const owner =
+    boardId === 'alex-kawalit'
+      ? USERS[1]
+      : boardId.startsWith('ab-fleet')
+        ? USERS[2]
+        : USERS[3]
+
+  return {
+    'auto-accept': {
+      type: 'auto-accept',
+      data: defaultAutoAccept(),
+      meta: makeMeta(owner, USERS[2], 'Aligned lead times with East Coast SLA', 21, 3),
+    },
+    customers: {
+      type: 'customers',
+      data: defaultCustomers(),
+      meta: makeMeta(owner, owner, 'Exclude Customer C from auto tendering', 18, 8),
+    },
+    regions: {
+      type: 'regions',
+      data: defaultRegions(),
+      meta: makeMeta(USERS[2], CURRENT_USER, 'Added Midwest as intermediate coverage', 14, 1),
+    },
+    notifications: {
+      type: 'notifications',
+      data: defaultNotifications(),
+      meta: makeMeta(USERS[1], USERS[1], 'Enable Slack alerts for rule changes', 10, 10),
+    },
+  }
+}
+
+export function configTypeLabel(id: ConfigTypeId): string {
+  return CONFIG_TYPES.find((c) => c.id === id)?.label ?? id
+}
