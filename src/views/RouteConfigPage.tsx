@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Check,
@@ -75,7 +75,7 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
       id: 's2',
       kind: 'driver',
       title: 'MARTINEZ free after 14:00',
-      detail: 'Same equipment type · 92% on-time on this corridor',
+      detail: 'Same equipment · 92% on-time on this corridor',
       actionLabel: 'Assign driver',
     },
     {
@@ -120,14 +120,34 @@ export default function RouteConfigPage({
   const [toast, setToast] = useState<string | null>(null)
   const [applied, setApplied] = useState<string[]>([])
   const [dirty, setDirty] = useState(false)
+  const pickerRef = useRef<HTMLDivElement>(null)
 
   const suggestions = useMemo(() => buildSuggestions(leg), [leg])
+  const primary = customers[0]
 
   useEffect(() => {
     if (!toast) return
     const t = window.setTimeout(() => setToast(null), 2200)
     return () => window.clearTimeout(t)
   }, [toast])
+
+  useEffect(() => {
+    if (!pickerOpen) return
+    function onDoc(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setPickerOpen(false)
+      }
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') setPickerOpen(false)
+    }
+    document.addEventListener('mousedown', onDoc)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDoc)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [pickerOpen])
 
   const availableToAdd = CUSTOMERS.filter(
     (c) => !customers.some((s) => s.name === c.name || s.id === c.id),
@@ -155,7 +175,7 @@ export default function RouteConfigPage({
     if (s.kind === 'tip') {
       updateDay('fri', { leadTimeHours: 16 })
     }
-    setToast(s.actionLabel === 'Assign driver' ? `Assigned from suggestion` : `Applied: ${s.title}`)
+    setToast(s.actionLabel === 'Assign driver' ? 'Assigned from suggestion' : `Applied: ${s.title}`)
     setDirty(true)
   }
 
@@ -171,10 +191,14 @@ export default function RouteConfigPage({
           <button type="button" className="rc-icon-btn" onClick={onBack} aria-label="Back">
             <ArrowLeft size={16} />
           </button>
-          <div>
-            <p className="rc-eyebrow">Route configuration</p>
-            <h1>Configure selected lane</h1>
-          </div>
+          <h1>Route configuration</h1>
+          <span className="rc-top-sep" />
+          <p className="rc-top-context">
+            {primary?.name}
+            <em>
+              {leg.start.kind} → {leg.end.kind}
+            </em>
+          </p>
         </div>
         <div className="rc-top-actions">
           {dirty && <span className="rc-dirty">Unsaved</span>}
@@ -189,18 +213,20 @@ export default function RouteConfigPage({
 
       <div className="rc-shell">
         <main className="rc-main">
-          <section className="rc-hero">
-            <div className="rc-customers">
-              <div className="rc-section-label">
+          <section className="rc-context">
+            <div className="rc-context-block">
+              <div className="rc-label-row">
                 <span>Selected customer</span>
-                <div className="rc-add-wrap">
+                <div className="rc-add-wrap" ref={pickerRef}>
                   <button
                     type="button"
-                    className="rc-add-customer"
+                    className="rc-add-btn"
                     onClick={() => setPickerOpen((v) => !v)}
                     title="Add customer"
+                    aria-expanded={pickerOpen}
                   >
                     <Plus size={14} />
+                    Add
                   </button>
                   {pickerOpen && (
                     <div className="rc-picker">
@@ -218,18 +244,20 @@ export default function RouteConfigPage({
                   )}
                 </div>
               </div>
-              <div className="rc-customer-chips">
+              <div className="rc-customer-row">
                 {customers.map((c, i) => (
-                  <div key={c.id} className={`rc-customer-chip ${i === 0 ? 'is-primary' : ''}`}>
-                    <div>
+                  <div key={c.id} className={`rc-customer ${i === 0 ? 'is-primary' : ''}`}>
+                    <div className="rc-customer-text">
                       <strong>{c.name}</strong>
                       <span>
                         {c.id} · {c.tag}
                       </span>
                     </div>
+                    {i === 0 && <em className="rc-primary-tag">Primary</em>}
                     {customers.length > 1 && (
                       <button
                         type="button"
+                        className="rc-remove"
                         aria-label={`Remove ${c.name}`}
                         onClick={() => removeCustomer(c.id)}
                       >
@@ -241,8 +269,8 @@ export default function RouteConfigPage({
               </div>
             </div>
 
-            <div className="rc-route-card">
-              <div className="rc-section-label">
+            <div className="rc-context-block rc-route-block">
+              <div className="rc-label-row">
                 <span>Selected route</span>
                 <em>
                   {boardId} · {leg.miles.toFixed(1)} mi
@@ -253,7 +281,7 @@ export default function RouteConfigPage({
                   <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
                     {leg.start.kind}
                   </span>
-                  <strong>{leg.start.name}</strong>
+                  <strong title={leg.start.name}>{leg.start.name}</strong>
                   <span>{leg.start.city}</span>
                   <span className="rc-when">{leg.start.when}</span>
                 </div>
@@ -265,15 +293,17 @@ export default function RouteConfigPage({
                   <span className="rc-dot" />
                 </div>
                 <div className="rc-stop end">
-                  <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
-                    {leg.end.kind}
-                  </span>
-                  <strong>{leg.end.name}</strong>
-                  <span>{leg.end.city}</span>
-                  <span className="rc-when">{leg.end.when}</span>
+                  <div className="rc-end-top">
+                    <strong title={leg.end.name}>{leg.end.name}</strong>
+                    <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
+                      {leg.end.kind}
+                    </span>
+                  </div>
+                  <span className="end-align">{leg.end.city}</span>
+                  <span className="rc-when end-align">{leg.end.when}</span>
                 </div>
               </div>
-              <div className="rc-route-meta">
+              <div className="rc-meta">
                 <span>{leg.equipment}</span>
                 <span>{leg.assigned}</span>
                 <span>{leg.driver ?? 'Unassigned'}</span>
@@ -285,9 +315,9 @@ export default function RouteConfigPage({
             <div className="rc-panel-head">
               <div>
                 <h2>Auto accept schedule</h2>
-                <p>Each day can have its own lead time and time window.</p>
+                <p>Set lead time and time of day for each weekday.</p>
               </div>
-              <div className="rc-seg">
+              <div className="rc-seg" role="group" aria-label="Auto accept">
                 <button
                   type="button"
                   className={enabled ? 'is-on' : ''}
@@ -311,7 +341,13 @@ export default function RouteConfigPage({
               </div>
             </div>
 
-            <div className={`rc-day-list ${enabled ? '' : 'is-off'}`}>
+            <div className={`rc-day-table ${enabled ? '' : 'is-off'}`}>
+              <div className="rc-day-head">
+                <span>Day</span>
+                <span>Lead time</span>
+                <span>From</span>
+                <span>To</span>
+              </div>
               {DAYS.map(({ key, label, full }) => {
                 const day = schedule[key]
                 return (
@@ -325,42 +361,36 @@ export default function RouteConfigPage({
                       <strong>{label}</strong>
                       <span>{full}</span>
                     </button>
-                    <label className="rc-day-field">
-                      <span>Lead time</span>
-                      <div className="rc-input">
-                        <input
-                          type="number"
-                          min={1}
-                          max={168}
-                          value={day.leadTimeHours}
-                          disabled={!enabled || !day.enabled}
-                          onChange={(e) =>
-                            updateDay(key, {
-                              leadTimeHours: Math.max(1, Math.min(168, Number(e.target.value) || 1)),
-                            })
-                          }
-                        />
-                        <em>hrs</em>
-                      </div>
-                    </label>
-                    <label className="rc-day-field">
-                      <span>Start</span>
+                    <div className="rc-input">
                       <input
-                        type="time"
-                        value={day.start}
+                        type="number"
+                        min={1}
+                        max={168}
+                        aria-label={`${full} lead time`}
+                        value={day.leadTimeHours}
                         disabled={!enabled || !day.enabled}
-                        onChange={(e) => updateDay(key, { start: e.target.value })}
+                        onChange={(e) =>
+                          updateDay(key, {
+                            leadTimeHours: Math.max(1, Math.min(168, Number(e.target.value) || 1)),
+                          })
+                        }
                       />
-                    </label>
-                    <label className="rc-day-field">
-                      <span>End</span>
-                      <input
-                        type="time"
-                        value={day.end}
-                        disabled={!enabled || !day.enabled}
-                        onChange={(e) => updateDay(key, { end: e.target.value })}
-                      />
-                    </label>
+                      <em>hrs</em>
+                    </div>
+                    <input
+                      type="time"
+                      aria-label={`${full} start time`}
+                      value={day.start}
+                      disabled={!enabled || !day.enabled}
+                      onChange={(e) => updateDay(key, { start: e.target.value })}
+                    />
+                    <input
+                      type="time"
+                      aria-label={`${full} end time`}
+                      value={day.end}
+                      disabled={!enabled || !day.enabled}
+                      onChange={(e) => updateDay(key, { end: e.target.value })}
+                    />
                   </div>
                 )
               })}
@@ -370,17 +400,15 @@ export default function RouteConfigPage({
 
         <aside className="rc-ai" aria-label="AI suggestions">
           <div className="rc-ai-head">
-            <Sparkles size={15} />
-            <div>
-              <h2>AI suggestions</h2>
-              <p>
-                Actionable ideas for {leg.start.kind} → {leg.end.kind}
-              </p>
-            </div>
+            <Sparkles size={14} />
+            <h2>AI suggestions</h2>
           </div>
+          <p className="rc-ai-sub">
+            Actionable options for {leg.start.kind} → {leg.end.kind}
+          </p>
 
-          <div className="rc-ai-route-pill">
-            <RouteIcon size={14} />
+          <div className="rc-ai-route">
+            <RouteIcon size={13} />
             <span>
               {leg.start.kind} → {leg.end.kind}
             </span>
@@ -394,11 +422,11 @@ export default function RouteConfigPage({
                 <li key={s.id} className={`rc-ai-card kind-${s.kind} ${done ? 'is-done' : ''}`}>
                   <div className="rc-ai-icon">
                     {s.kind === 'driver' ? (
-                      <UserPlus size={14} />
+                      <UserPlus size={13} />
                     ) : s.kind === 'route' ? (
-                      <Truck size={14} />
+                      <Truck size={13} />
                     ) : (
-                      <Sparkles size={14} />
+                      <Sparkles size={13} />
                     )}
                   </div>
                   <div className="rc-ai-copy">
