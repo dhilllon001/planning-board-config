@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowLeft, Check, Copy, MapPin, Plus, Search, X } from 'lucide-react'
+import { ArrowLeft, Check, Copy, Plus, Search, X } from 'lucide-react'
 import type { BoardLeg } from '../data/boardSeed'
 import {
   BOARDS,
@@ -501,43 +501,45 @@ export default function RouteConfigPage({
                 </div>
               </div>
 
-              <div className="rc-route-visual">
-                <div className="rc-stop">
+              <div className={`rc-route-card mode-${stopMode}`}>
+                <div className="rc-route-stop start">
                   <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
                     {leg.start.kind}
                   </span>
                   <strong title={startLabel}>{startLabel}</strong>
-                  {stopMode === 'location' && <span>{leg.start.city}</span>}
-                  {stopMode === 'city' && (
-                    <span className="rc-stop-hint">
-                      <MapPin size={11} />
-                      City / state only
-                    </span>
+                  {stopMode === 'location' && (
+                    <span className="rc-stop-sub">{leg.start.city}</span>
                   )}
                   <span className="rc-when">{leg.start.when}</span>
                 </div>
-                <div className="rc-line">
-                  <span className="rc-dot" />
-                  <span className="rc-dash" />
+
+                <div className="rc-route-path" aria-hidden="true">
+                  <span className="rc-lamp start" />
+                  <span className="rc-road">
+                    <span className="rc-road-glow" />
+                    <span className="rc-road-light" />
+                    <span className="rc-road-light" />
+                    <span className="rc-road-light" />
+                  </span>
                   <span className="rc-miles">{leg.miles.toFixed(1)} mi</span>
-                  <span className="rc-dash" />
-                  <span className="rc-dot" />
+                  <span className="rc-road">
+                    <span className="rc-road-glow" />
+                    <span className="rc-road-light" />
+                    <span className="rc-road-light" />
+                    <span className="rc-road-light" />
+                  </span>
+                  <span className="rc-lamp end" />
                 </div>
-                <div className="rc-stop end">
-                  <div className="rc-end-top">
-                    <strong title={endLabel}>{endLabel}</strong>
-                    <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
-                      {leg.end.kind}
-                    </span>
-                  </div>
-                  {stopMode === 'location' && <span className="end-align">{leg.end.city}</span>}
-                  {stopMode === 'city' && (
-                    <span className="rc-stop-hint end-align">
-                      <MapPin size={11} />
-                      City / state only
-                    </span>
+
+                <div className="rc-route-stop end">
+                  <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
+                    {leg.end.kind}
+                  </span>
+                  <strong title={endLabel}>{endLabel}</strong>
+                  {stopMode === 'location' && (
+                    <span className="rc-stop-sub">{leg.end.city}</span>
                   )}
-                  <span className="rc-when end-align">{leg.end.when}</span>
+                  <span className="rc-when">{leg.end.when}</span>
                 </div>
               </div>
 
