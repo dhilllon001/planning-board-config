@@ -29,8 +29,8 @@
   --sidebar-w: 10%;
   --template-w: 15%;
   --meta-w: 270px;
-  --font: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --mono: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --mono: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
 }
 
 *,
@@ -48,6 +48,8 @@ body,
 body {
   margin: 0;
   font-family: var(--font);
+  font-size: 12px;
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
   color: var(--fg-1);
   background: var(--bg-app);

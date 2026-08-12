@@ -13,12 +13,19 @@
   --rc-board-w: 10%;
   --rc-template-w: 15%;
   --rc-ai-w: 30%;
+  --rc-font: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  --rc-fs: 12px;
+  --rc-fs-sm: 11px;
+  --rc-fs-md: 13px;
+  --rc-fs-lg: 15px;
   height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--rc-bg);
   color: var(--rc-fg);
-  font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--rc-font);
+  font-size: var(--rc-fs);
+  line-height: 1.4;
   font-variant-numeric: tabular-nums;
   overflow: hidden;
 }
@@ -217,7 +224,7 @@
   align-items: center;
   justify-content: center;
   border-radius: 999px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
 }
 
@@ -233,7 +240,7 @@
 
 .rc-rail-kicker {
   margin: 0 0 2px;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -362,7 +369,7 @@
 
 .rc-rail-top em {
   font-style: normal;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: #9aa8b8;
   flex-shrink: 0;
@@ -373,7 +380,7 @@
 }
 
 .rc-rail-meta {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--rc-muted);
 }
 
@@ -383,7 +390,7 @@
 
 .rc-status {
   flex-shrink: 0;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.03em;
   text-transform: uppercase;
@@ -434,7 +441,7 @@
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 8px;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -509,7 +516,7 @@
 
 .rc-picker em {
   font-style: normal;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--rc-muted);
 }
@@ -569,7 +576,7 @@
 
 .rc-primary-tag {
   font-style: normal;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -628,7 +635,7 @@
 .rc-badge {
   display: inline-flex;
   align-self: flex-start;
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.04em;
   padding: 2px 6px;
@@ -704,7 +711,7 @@
   border-radius: 999px;
   border: 1px solid #d5dbe3;
   background: #fff;
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   color: #475569;
   white-space: nowrap;
@@ -744,7 +751,7 @@
 }
 
 .rc-planned-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -841,7 +848,7 @@
 .rc-day-head {
   background: #f3f5f8;
   border-bottom: 1px solid var(--rc-border);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -880,7 +887,7 @@
 }
 
 .rc-day-toggle span {
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.85;
 }
 
