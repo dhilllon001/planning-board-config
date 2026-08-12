@@ -1,16 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import {
-  ArrowLeft,
-  Check,
-  Copy,
-  Plus,
-  Search,
-  Sparkles,
-  Truck,
-  UserPlus,
-  Route as RouteIcon,
-  X,
-} from 'lucide-react'
+import { ArrowLeft, Check, Copy, MapPin, Plus, Search, X } from 'lucide-react'
 import type { BoardLeg } from '../data/boardSeed'
 import {
   BOARDS,
@@ -31,11 +20,14 @@ const DAYS: { key: DayKey; label: string; full: string }[] = [
   { key: 'sun', label: 'Sun', full: 'Sunday' },
 ]
 
+type StopDisplayMode = 'location' | 'city'
+
 interface DaySchedule {
   enabled: boolean
   leadTimeHours: number
   start: string
   end: string
+  maxLoads: number
 }
 
 type ScheduleMap = Record<DayKey, DaySchedule>
@@ -44,21 +36,6 @@ interface SelectedCustomer {
   id: string
   name: string
   tag: string
-}
-
-interface AiSuggestion {
-  id: string
-  kind: 'driver' | 'route' | 'tip'
-  title: string
-  detail: string
-  actionLabel: string
-  driverName?: string
-  nextRouteLabel?: string
-}
-
-interface PlannedRoute {
-  id: string
-  label: string
 }
 
 function defaultSchedule(): ScheduleMap {
@@ -71,6 +48,7 @@ function defaultSchedule(): ScheduleMap {
         leadTimeHours: key === 'fri' ? 16 : 12,
         start: '06:00',
         end: '18:00',
+        maxLoads: key === 'fri' ? 4 : 6,
       },
     ]),
   ) as ScheduleMap
@@ -91,53 +69,10 @@ function scheduleFromTemplate(template: ConfigTemplate): ScheduleMap {
         leadTimeHours: primary.leadTimeHours,
         start: primary.timeOfDay.start,
         end: primary.timeOfDay.end,
+        maxLoads: base[key].maxLoads,
       },
     ]),
   ) as ScheduleMap
-}
-
-function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
-  return [
-    {
-      id: 's1',
-      kind: 'driver',
-      title: 'JORGEI is available',
-      detail: `Near ${leg.start.city} · can cover ${leg.start.kind} → ${leg.end.kind}`,
-      actionLabel: 'Assign driver',
-      driverName: 'JORGEI',
-    },
-    {
-      id: 's2',
-      kind: 'driver',
-      title: 'MARTINEZ free after 14:00',
-      detail: 'Same equipment · 92% on-time on this corridor',
-      actionLabel: 'Assign driver',
-      driverName: 'MARTINEZ',
-    },
-    {
-      id: 's3',
-      kind: 'route',
-      title: 'Next route available',
-      detail: `${leg.end.city} → Midwest Hub · empty mile opportunity`,
-      actionLabel: 'Add to plan',
-      nextRouteLabel: `${leg.end.city} → Midwest Hub`,
-    },
-    {
-      id: 's4',
-      kind: 'route',
-      title: 'Backhaul match',
-      detail: `Return ${leg.end.kind} load toward ${leg.start.city} within 6h`,
-      actionLabel: 'Add to plan',
-      nextRouteLabel: `${leg.end.kind} → ${leg.start.city}`,
-    },
-    {
-      id: 's5',
-      kind: 'tip',
-      title: 'Tighten Friday lead time',
-      detail: 'Similar lanes run better with 16h lead on Fridays',
-      actionLabel: 'Apply tip',
-    },
-  ]
 }
 
 function formatCreated(iso: string): string {
@@ -146,6 +81,16 @@ function formatCreated(iso: string): string {
     day: 'numeric',
     year: 'numeric',
   })
+}
+
+function customerInitials(name: string): string {
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0])
+    .join('')
+    .toUpperCase()
 }
 
 export default function RouteConfigPage({
@@ -172,19 +117,15 @@ export default function RouteConfigPage({
   ])
   const [enabled, setEnabled] = useState(true)
   const [schedule, setSchedule] = useState<ScheduleMap>(() => defaultSchedule())
-  const [assignedDriver, setAssignedDriver] = useState(leg.driver ?? 'Unassigned')
-  const [plannedRoutes, setPlannedRoutes] = useState<PlannedRoute[]>([])
+  const [stopMode, setStopMode] = useState<StopDisplayMode>('location')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
-  const [applied, setApplied] = useState<string[]>([])
   const [dirty, setDirty] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
 
   const board = BOARDS.find((b) => b.id === selectedBoardId) ?? BOARDS[0]
   const templates = templateStore[selectedBoardId] ?? createTemplatesForBoard(selectedBoardId)
   const activeTemplate = templates.find((t) => t.id === templateId) ?? templates[0]
-
-  const suggestions = useMemo(() => buildSuggestions(leg), [leg])
 
   const filteredBoards = useMemo(() => {
     const q = boardQuery.trim().toLowerCase()
@@ -252,8 +193,6 @@ export default function RouteConfigPage({
       setEnabled(nextTemplate.settings['auto-accept'].autoAccept)
       setSchedule(scheduleFromTemplate(nextTemplate))
     }
-    setApplied([])
-    setPlannedRoutes([])
     setDirty(false)
     setToast(`Switched to ${BOARDS.find((b) => b.id === nextId)?.shortName ?? nextId}`)
   }
@@ -265,7 +204,6 @@ export default function RouteConfigPage({
     setTemplateId(nextId)
     setEnabled(next.settings['auto-accept'].autoAccept)
     setSchedule(scheduleFromTemplate(next))
-    setApplied([])
     setDirty(false)
     setToast(`Loaded ${next.name}`)
   }
@@ -317,29 +255,12 @@ export default function RouteConfigPage({
     setDirty(true)
   }
 
-  function applySuggestion(s: AiSuggestion) {
-    if (applied.includes(s.id)) return
-    setApplied((prev) => [...prev, s.id])
-
-    if (s.kind === 'driver' && s.driverName) {
-      setAssignedDriver(s.driverName)
-      setToast(`Assigned ${s.driverName}`)
-    } else if (s.kind === 'route' && s.nextRouteLabel) {
-      setPlannedRoutes((prev) =>
-        prev.some((r) => r.id === s.id)
-          ? prev
-          : [...prev, { id: s.id, label: s.nextRouteLabel! }],
-      )
-      setToast(`Added ${s.nextRouteLabel} to plan`)
-    } else if (s.kind === 'tip') {
-      setSchedule((prev) => ({
-        ...prev,
-        fri: { ...prev.fri, enabled: true, leadTimeHours: 16 },
-      }))
-      setToast('Friday lead time set to 16 hrs')
-    } else {
-      setToast(`Applied: ${s.title}`)
-    }
+  function setPrimaryCustomer(id: string) {
+    setCustomers((prev) => {
+      const next = prev.find((c) => c.id === id)
+      if (!next || prev[0]?.id === id) return prev
+      return [next, ...prev.filter((c) => c.id !== id)]
+    })
     setDirty(true)
   }
 
@@ -355,13 +276,14 @@ export default function RouteConfigPage({
     }
     setEnabled(activeTemplate.settings['auto-accept'].autoAccept)
     setSchedule(scheduleFromTemplate(activeTemplate))
-    setAssignedDriver(leg.driver ?? 'Unassigned')
-    setPlannedRoutes([])
-    setApplied([])
+    setStopMode('location')
     setCustomers([{ id: leg.customerId, name: leg.customer, tag: leg.tag }])
     setDirty(false)
     setToast('Changes discarded')
   }
+
+  const startLabel = stopMode === 'city' ? leg.start.city : leg.start.name
+  const endLabel = stopMode === 'city' ? leg.end.city : leg.end.name
 
   return (
     <div className="rc">
@@ -482,7 +404,7 @@ export default function RouteConfigPage({
           <section className="rc-context">
             <div className="rc-context-block">
               <div className="rc-label-row">
-                <span>Selected customer</span>
+                <span>Selected customers</span>
                 <div className="rc-add-wrap" ref={pickerRef}>
                   <button
                     type="button"
@@ -492,7 +414,7 @@ export default function RouteConfigPage({
                     aria-expanded={pickerOpen}
                   >
                     <Plus size={14} />
-                    Add
+                    Add customer
                   </button>
                   {pickerOpen && (
                     <div className="rc-picker">
@@ -501,8 +423,11 @@ export default function RouteConfigPage({
                       ) : (
                         availableToAdd.map((c) => (
                           <button key={c.id} type="button" onClick={() => addCustomer(c)}>
-                            <strong>{c.name}</strong>
-                            <em>{c.tag}</em>
+                            <span className="rc-picker-avatar">{customerInitials(c.name)}</span>
+                            <span className="rc-picker-copy">
+                              <strong>{c.name}</strong>
+                              <em>{c.tag}</em>
+                            </span>
                           </button>
                         ))
                       )}
@@ -510,26 +435,40 @@ export default function RouteConfigPage({
                   )}
                 </div>
               </div>
-              <div className="rc-customer-row">
+
+              <div className="rc-customer-list">
                 {customers.map((c, i) => (
-                  <div key={c.id} className={`rc-customer ${i === 0 ? 'is-primary' : ''}`}>
+                  <div key={c.id} className={`rc-customer-card ${i === 0 ? 'is-primary' : ''}`}>
+                    <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
                     <div className="rc-customer-text">
                       <strong>{c.name}</strong>
                       <span>
                         {c.id} · {c.tag}
                       </span>
                     </div>
-                    {i === 0 && <em className="rc-primary-tag">Primary</em>}
-                    {customers.length > 1 && (
-                      <button
-                        type="button"
-                        className="rc-remove"
-                        aria-label={`Remove ${c.name}`}
-                        onClick={() => removeCustomer(c.id)}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
+                    <div className="rc-customer-actions">
+                      {i === 0 ? (
+                        <em className="rc-primary-tag">Primary</em>
+                      ) : (
+                        <button
+                          type="button"
+                          className="rc-make-primary"
+                          onClick={() => setPrimaryCustomer(c.id)}
+                        >
+                          Make primary
+                        </button>
+                      )}
+                      {customers.length > 1 && (
+                        <button
+                          type="button"
+                          className="rc-remove"
+                          aria-label={`Remove ${c.name}`}
+                          onClick={() => removeCustomer(c.id)}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
@@ -538,17 +477,43 @@ export default function RouteConfigPage({
             <div className="rc-context-block rc-route-block">
               <div className="rc-label-row">
                 <span>Selected route</span>
-                <em>
-                  {activeTemplate?.name ?? 'Template'} · {leg.miles.toFixed(1)} mi
-                </em>
+                <div className="rc-stop-mode" role="group" aria-label="Stop display">
+                  <button
+                    type="button"
+                    className={stopMode === 'location' ? 'is-on' : ''}
+                    onClick={() => {
+                      setStopMode('location')
+                      setDirty(true)
+                    }}
+                  >
+                    Location
+                  </button>
+                  <button
+                    type="button"
+                    className={stopMode === 'city' ? 'is-on' : ''}
+                    onClick={() => {
+                      setStopMode('city')
+                      setDirty(true)
+                    }}
+                  >
+                    City / state
+                  </button>
+                </div>
               </div>
+
               <div className="rc-route-visual">
                 <div className="rc-stop">
                   <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
                     {leg.start.kind}
                   </span>
-                  <strong title={leg.start.name}>{leg.start.name}</strong>
-                  <span>{leg.start.city}</span>
+                  <strong title={startLabel}>{startLabel}</strong>
+                  {stopMode === 'location' && <span>{leg.start.city}</span>}
+                  {stopMode === 'city' && (
+                    <span className="rc-stop-hint">
+                      <MapPin size={11} />
+                      City / state only
+                    </span>
+                  )}
                   <span className="rc-when">{leg.start.when}</span>
                 </div>
                 <div className="rc-line">
@@ -560,33 +525,28 @@ export default function RouteConfigPage({
                 </div>
                 <div className="rc-stop end">
                   <div className="rc-end-top">
-                    <strong title={leg.end.name}>{leg.end.name}</strong>
+                    <strong title={endLabel}>{endLabel}</strong>
                     <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
                       {leg.end.kind}
                     </span>
                   </div>
-                  <span className="end-align">{leg.end.city}</span>
+                  {stopMode === 'location' && <span className="end-align">{leg.end.city}</span>}
+                  {stopMode === 'city' && (
+                    <span className="rc-stop-hint end-align">
+                      <MapPin size={11} />
+                      City / state only
+                    </span>
+                  )}
                   <span className="rc-when end-align">{leg.end.when}</span>
                 </div>
               </div>
+
               <div className="rc-meta">
                 <span>{leg.equipment}</span>
                 <span>{leg.assigned}</span>
-                <span className={assignedDriver !== 'Unassigned' ? 'is-assigned' : ''}>
-                  {assignedDriver}
-                </span>
+                <span>{leg.driver ?? 'Unassigned'}</span>
+                <span>{activeTemplate?.name ?? 'Template'}</span>
               </div>
-              {plannedRoutes.length > 0 && (
-                <div className="rc-planned">
-                  <span className="rc-planned-label">Added to plan</span>
-                  {plannedRoutes.map((r) => (
-                    <span key={r.id} className="rc-planned-chip">
-                      <RouteIcon size={12} />
-                      {r.label}
-                    </span>
-                  ))}
-                </div>
-              )}
             </div>
           </section>
 
@@ -594,7 +554,7 @@ export default function RouteConfigPage({
             <div className="rc-panel-head">
               <div>
                 <h2>Auto accept schedule</h2>
-                <p>Set lead time and time of day for each weekday.</p>
+                <p>Lead time, time window, and max loads per day.</p>
               </div>
               <div className="rc-seg" role="group" aria-label="Auto accept">
                 <button
@@ -626,6 +586,7 @@ export default function RouteConfigPage({
                 <span>Lead time</span>
                 <span>From</span>
                 <span>To</span>
+                <span>Max loads</span>
               </div>
               {DAYS.map(({ key, label, full }) => {
                 const day = schedule[key]
@@ -670,67 +631,28 @@ export default function RouteConfigPage({
                       disabled={!enabled || !day.enabled}
                       onChange={(e) => updateDay(key, { end: e.target.value })}
                     />
+                    <div className="rc-input">
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        aria-label={`${full} max loads`}
+                        value={day.maxLoads}
+                        disabled={!enabled || !day.enabled}
+                        onChange={(e) =>
+                          updateDay(key, {
+                            maxLoads: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                          })
+                        }
+                      />
+                      <em>loads</em>
+                    </div>
                   </div>
                 )
               })}
             </div>
           </section>
         </main>
-
-        <aside className="rc-ai" aria-label="AI suggestions">
-          <div className="rc-ai-head">
-            <Sparkles size={14} />
-            <h2>AI suggestions</h2>
-          </div>
-          <p className="rc-ai-sub">
-            Actionable options for {leg.start.kind} → {leg.end.kind}
-          </p>
-
-          <div className="rc-ai-route">
-            <RouteIcon size={13} />
-            <span>
-              {leg.start.kind} → {leg.end.kind}
-            </span>
-            <em>{leg.miles.toFixed(1)} mi</em>
-          </div>
-
-          <ul className="rc-ai-list">
-            {suggestions.map((s) => {
-              const done = applied.includes(s.id)
-              return (
-                <li key={s.id} className={`rc-ai-card kind-${s.kind} ${done ? 'is-done' : ''}`}>
-                  <div className="rc-ai-icon">
-                    {s.kind === 'driver' ? (
-                      <UserPlus size={13} />
-                    ) : s.kind === 'route' ? (
-                      <Truck size={13} />
-                    ) : (
-                      <Sparkles size={13} />
-                    )}
-                  </div>
-                  <div className="rc-ai-copy">
-                    <strong>{s.title}</strong>
-                    <span>{s.detail}</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="rc-ai-action"
-                    disabled={done}
-                    onClick={() => applySuggestion(s)}
-                  >
-                    {done ? (
-                      <>
-                        <Check size={12} /> Done
-                      </>
-                    ) : (
-                      s.actionLabel
-                    )}
-                  </button>
-                </li>
-              )
-            })}
-          </ul>
-        </aside>
       </div>
 
       {toast && (
