@@ -75,14 +75,6 @@ function scheduleFromTemplate(template: ConfigTemplate): ScheduleMap {
   ) as ScheduleMap
 }
 
-function formatCreated(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  })
-}
-
 function customerInitials(name: string): string {
   return name
     .split(/\s+/)
@@ -336,11 +328,8 @@ export default function RouteConfigPage({
                     onClick={() => switchBoard(b.id)}
                     title={b.name}
                   >
-                    <span className="rc-rail-top">
-                      <strong>{b.shortName}</strong>
-                      <em>{b.legCount}</em>
-                    </span>
-                    <span className="rc-rail-meta">{b.region}</span>
+                    <strong>{b.shortName}</strong>
+                    <em>{b.legCount}</em>
                   </button>
                 </li>
               ))}
@@ -385,14 +374,12 @@ export default function RouteConfigPage({
                     type="button"
                     className={t.id === activeTemplate?.id ? 'is-active' : ''}
                     onClick={() => switchTemplate(t.id)}
+                    title={t.description}
                   >
-                    <span className="rc-rail-top">
-                      <strong>{t.name}</strong>
-                      <span className={`rc-status ${t.active ? 'is-active' : ''}`}>
-                        {t.active ? 'Active' : 'Inactive'}
-                      </span>
+                    <strong>{t.name}</strong>
+                    <span className={`rc-status ${t.active ? 'is-active' : ''}`}>
+                      {t.active ? 'Active' : 'Off'}
                     </span>
-                    <span className="rc-rail-meta">{formatCreated(t.meta.createdAt)}</span>
                   </button>
                 </li>
               ))}
@@ -503,43 +490,37 @@ export default function RouteConfigPage({
 
               <div className={`rc-route-card mode-${stopMode}`}>
                 <div className="rc-route-stop start">
-                  <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
-                    {leg.start.kind}
-                  </span>
+                  <div className="rc-stop-row">
+                    <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
+                      {leg.start.kind}
+                    </span>
+                    <span className="rc-when">{leg.start.when}</span>
+                  </div>
                   <strong title={startLabel}>{startLabel}</strong>
                   {stopMode === 'location' && (
                     <span className="rc-stop-sub">{leg.start.city}</span>
                   )}
-                  <span className="rc-when">{leg.start.when}</span>
                 </div>
 
                 <div className="rc-route-path" aria-hidden="true">
                   <span className="rc-lamp start" />
-                  <span className="rc-road">
-                    <span className="rc-road-glow" />
-                    <span className="rc-road-light" />
-                    <span className="rc-road-light" />
-                    <span className="rc-road-light" />
-                  </span>
+                  <span className="rc-road" />
                   <span className="rc-miles">{leg.miles.toFixed(1)} mi</span>
-                  <span className="rc-road">
-                    <span className="rc-road-glow" />
-                    <span className="rc-road-light" />
-                    <span className="rc-road-light" />
-                    <span className="rc-road-light" />
-                  </span>
+                  <span className="rc-road" />
                   <span className="rc-lamp end" />
                 </div>
 
                 <div className="rc-route-stop end">
-                  <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
-                    {leg.end.kind}
-                  </span>
+                  <div className="rc-stop-row end">
+                    <span className="rc-when">{leg.end.when}</span>
+                    <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
+                      {leg.end.kind}
+                    </span>
+                  </div>
                   <strong title={endLabel}>{endLabel}</strong>
                   {stopMode === 'location' && (
                     <span className="rc-stop-sub">{leg.end.city}</span>
                   )}
-                  <span className="rc-when">{leg.end.when}</span>
                 </div>
               </div>
 
@@ -590,7 +571,7 @@ export default function RouteConfigPage({
                 <span>To</span>
                 <span>Max loads</span>
               </div>
-              {DAYS.map(({ key, label, full }) => {
+              {DAYS.map(({ key, label }) => {
                 const day = schedule[key]
                 return (
                   <div key={key} className={`rc-day-row ${day.enabled ? 'is-enabled' : ''}`}>
@@ -600,15 +581,14 @@ export default function RouteConfigPage({
                       disabled={!enabled}
                       onClick={() => updateDay(key, { enabled: !day.enabled })}
                     >
-                      <strong>{label}</strong>
-                      <span>{full}</span>
+                      {label}
                     </button>
                     <div className="rc-input">
                       <input
                         type="number"
                         min={1}
                         max={168}
-                        aria-label={`${full} lead time`}
+                        aria-label={`${label} lead time`}
                         value={day.leadTimeHours}
                         disabled={!enabled || !day.enabled}
                         onChange={(e) =>
@@ -621,24 +601,32 @@ export default function RouteConfigPage({
                     </div>
                     <input
                       type="time"
-                      aria-label={`${full} start time`}
+                      aria-label={`${label} start time`}
                       value={day.start}
                       disabled={!enabled || !day.enabled}
                       onChange={(e) => updateDay(key, { start: e.target.value })}
                     />
                     <input
                       type="time"
-                      aria-label={`${full} end time`}
+                      aria-label={`${label} end time`}
                       value={day.end}
                       disabled={!enabled || !day.enabled}
                       onChange={(e) => updateDay(key, { end: e.target.value })}
                     />
-                    <div className="rc-input">
+                    <div className="rc-loads">
+                      <button
+                        type="button"
+                        disabled={!enabled || !day.enabled || day.maxLoads <= 1}
+                        aria-label={`Decrease ${label} max loads`}
+                        onClick={() => updateDay(key, { maxLoads: Math.max(1, day.maxLoads - 1) })}
+                      >
+                        −
+                      </button>
                       <input
                         type="number"
                         min={1}
                         max={99}
-                        aria-label={`${full} max loads`}
+                        aria-label={`${label} max loads`}
                         value={day.maxLoads}
                         disabled={!enabled || !day.enabled}
                         onChange={(e) =>
@@ -647,7 +635,14 @@ export default function RouteConfigPage({
                           })
                         }
                       />
-                      <em>loads</em>
+                      <button
+                        type="button"
+                        disabled={!enabled || !day.enabled || day.maxLoads >= 99}
+                        aria-label={`Increase ${label} max loads`}
+                        onClick={() => updateDay(key, { maxLoads: Math.min(99, day.maxLoads + 1) })}
+                      >
+                        +
+                      </button>
                     </div>
                   </div>
                 )
