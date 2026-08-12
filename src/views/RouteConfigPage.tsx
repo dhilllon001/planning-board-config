@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft,
   Check,
+  Copy,
   Plus,
+  Search,
   Sparkles,
   Truck,
   UserPlus,
@@ -10,8 +12,13 @@ import {
   X,
 } from 'lucide-react'
 import type { BoardLeg } from '../data/boardSeed'
-import { CUSTOMERS } from '../data/seed'
-import type { DayKey } from '../types'
+import {
+  BOARDS,
+  CUSTOMERS,
+  createEmptyTemplate,
+  createTemplatesForBoard,
+} from '../data/seed'
+import type { ConfigTemplate, DayKey } from '../types'
 import './route-config.css'
 
 const DAYS: { key: DayKey; label: string; full: string }[] = [
@@ -45,6 +52,13 @@ interface AiSuggestion {
   title: string
   detail: string
   actionLabel: string
+  driverName?: string
+  nextRouteLabel?: string
+}
+
+interface PlannedRoute {
+  id: string
+  label: string
 }
 
 function defaultSchedule(): ScheduleMap {
@@ -62,6 +76,26 @@ function defaultSchedule(): ScheduleMap {
   ) as ScheduleMap
 }
 
+function scheduleFromTemplate(template: ConfigTemplate): ScheduleMap {
+  const base = defaultSchedule()
+  const legs = template.settings['auto-accept'].routeLegs
+  const primary = legs.find((l) => l.enabled) ?? legs[0]
+  if (!primary) return base
+
+  const allowed = new Set(primary.daysAllowed)
+  return Object.fromEntries(
+    DAYS.map(({ key }) => [
+      key,
+      {
+        enabled: allowed.has(key),
+        leadTimeHours: primary.leadTimeHours,
+        start: primary.timeOfDay.start,
+        end: primary.timeOfDay.end,
+      },
+    ]),
+  ) as ScheduleMap
+}
+
 function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
   return [
     {
@@ -70,6 +104,7 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
       title: 'JORGEI is available',
       detail: `Near ${leg.start.city} · can cover ${leg.start.kind} → ${leg.end.kind}`,
       actionLabel: 'Assign driver',
+      driverName: 'JORGEI',
     },
     {
       id: 's2',
@@ -77,6 +112,7 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
       title: 'MARTINEZ free after 14:00',
       detail: 'Same equipment · 92% on-time on this corridor',
       actionLabel: 'Assign driver',
+      driverName: 'MARTINEZ',
     },
     {
       id: 's3',
@@ -84,6 +120,7 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
       title: 'Next route available',
       detail: `${leg.end.city} → Midwest Hub · empty mile opportunity`,
       actionLabel: 'Add to plan',
+      nextRouteLabel: `${leg.end.city} → Midwest Hub`,
     },
     {
       id: 's4',
@@ -91,6 +128,7 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
       title: 'Backhaul match',
       detail: `Return ${leg.end.kind} load toward ${leg.start.city} within 6h`,
       actionLabel: 'Add to plan',
+      nextRouteLabel: `${leg.end.kind} → ${leg.start.city}`,
     },
     {
       id: 's5',
@@ -102,28 +140,70 @@ function buildSuggestions(leg: BoardLeg): AiSuggestion[] {
   ]
 }
 
+function formatCreated(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export default function RouteConfigPage({
   leg,
-  boardId,
+  boardId: initialBoardId,
   onBack,
 }: {
   leg: BoardLeg
   boardId: string
   onBack: () => void
 }) {
+  const [selectedBoardId, setSelectedBoardId] = useState(initialBoardId)
+  const [templateStore, setTemplateStore] = useState<Record<string, ConfigTemplate[]>>(() => ({
+    [initialBoardId]: createTemplatesForBoard(initialBoardId),
+  }))
+  const [templateId, setTemplateId] = useState(
+    () => createTemplatesForBoard(initialBoardId)[0]?.id ?? '',
+  )
+  const [boardQuery, setBoardQuery] = useState('')
+  const [templateQuery, setTemplateQuery] = useState('')
+
   const [customers, setCustomers] = useState<SelectedCustomer[]>([
     { id: leg.customerId, name: leg.customer, tag: leg.tag },
   ])
   const [enabled, setEnabled] = useState(true)
   const [schedule, setSchedule] = useState<ScheduleMap>(() => defaultSchedule())
+  const [assignedDriver, setAssignedDriver] = useState(leg.driver ?? 'Unassigned')
+  const [plannedRoutes, setPlannedRoutes] = useState<PlannedRoute[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [applied, setApplied] = useState<string[]>([])
   const [dirty, setDirty] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
 
+  const board = BOARDS.find((b) => b.id === selectedBoardId) ?? BOARDS[0]
+  const templates = templateStore[selectedBoardId] ?? createTemplatesForBoard(selectedBoardId)
+  const activeTemplate = templates.find((t) => t.id === templateId) ?? templates[0]
+
   const suggestions = useMemo(() => buildSuggestions(leg), [leg])
-  const primary = customers[0]
+
+  const filteredBoards = useMemo(() => {
+    const q = boardQuery.trim().toLowerCase()
+    if (!q) return BOARDS
+    return BOARDS.filter(
+      (b) =>
+        b.name.toLowerCase().includes(q) ||
+        b.shortName.toLowerCase().includes(q) ||
+        b.region.toLowerCase().includes(q),
+    )
+  }, [boardQuery])
+
+  const filteredTemplates = useMemo(() => {
+    const q = templateQuery.trim().toLowerCase()
+    if (!q) return templates
+    return templates.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.description.toLowerCase().includes(q),
+    )
+  }, [templateQuery, templates])
 
   useEffect(() => {
     if (!toast) return
@@ -153,6 +233,73 @@ export default function RouteConfigPage({
     (c) => !customers.some((s) => s.name === c.name || s.id === c.id),
   )
 
+  function ensureTemplates(boardKey: string) {
+    setTemplateStore((prev) => {
+      if (prev[boardKey]) return prev
+      return { ...prev, [boardKey]: createTemplatesForBoard(boardKey) }
+    })
+  }
+
+  function switchBoard(nextId: string) {
+    if (nextId === selectedBoardId) return
+    ensureTemplates(nextId)
+    const nextTemplates = templateStore[nextId] ?? createTemplatesForBoard(nextId)
+    const nextTemplate = nextTemplates[0]
+    setSelectedBoardId(nextId)
+    setTemplateId(nextTemplate?.id ?? '')
+    setTemplateQuery('')
+    if (nextTemplate) {
+      setEnabled(nextTemplate.settings['auto-accept'].autoAccept)
+      setSchedule(scheduleFromTemplate(nextTemplate))
+    }
+    setApplied([])
+    setPlannedRoutes([])
+    setDirty(false)
+    setToast(`Switched to ${BOARDS.find((b) => b.id === nextId)?.shortName ?? nextId}`)
+  }
+
+  function switchTemplate(nextId: string) {
+    if (nextId === templateId) return
+    const next = templates.find((t) => t.id === nextId)
+    if (!next) return
+    setTemplateId(nextId)
+    setEnabled(next.settings['auto-accept'].autoAccept)
+    setSchedule(scheduleFromTemplate(next))
+    setApplied([])
+    setDirty(false)
+    setToast(`Loaded ${next.name}`)
+  }
+
+  function addTemplate() {
+    const created = createEmptyTemplate(selectedBoardId)
+    setTemplateStore((prev) => ({
+      ...prev,
+      [selectedBoardId]: [...(prev[selectedBoardId] ?? templates), created],
+    }))
+    setTemplateId(created.id)
+    setEnabled(created.settings['auto-accept'].autoAccept)
+    setSchedule(scheduleFromTemplate(created))
+    setDirty(true)
+    setToast('New template created')
+  }
+
+  function duplicateTemplate() {
+    if (!activeTemplate) return
+    const copy: ConfigTemplate = {
+      ...structuredClone(activeTemplate),
+      id: `${selectedBoardId}-tmpl-${Date.now()}`,
+      name: `${activeTemplate.name} Copy`,
+      active: false,
+    }
+    setTemplateStore((prev) => ({
+      ...prev,
+      [selectedBoardId]: [...(prev[selectedBoardId] ?? templates), copy],
+    }))
+    setTemplateId(copy.id)
+    setDirty(true)
+    setToast('Template duplicated')
+  }
+
   function updateDay(day: DayKey, patch: Partial<DaySchedule>) {
     setSchedule((prev) => ({ ...prev, [day]: { ...prev[day], ...patch } }))
     setDirty(true)
@@ -171,17 +318,49 @@ export default function RouteConfigPage({
   }
 
   function applySuggestion(s: AiSuggestion) {
-    setApplied((prev) => (prev.includes(s.id) ? prev : [...prev, s.id]))
-    if (s.kind === 'tip') {
-      updateDay('fri', { leadTimeHours: 16 })
+    if (applied.includes(s.id)) return
+    setApplied((prev) => [...prev, s.id])
+
+    if (s.kind === 'driver' && s.driverName) {
+      setAssignedDriver(s.driverName)
+      setToast(`Assigned ${s.driverName}`)
+    } else if (s.kind === 'route' && s.nextRouteLabel) {
+      setPlannedRoutes((prev) =>
+        prev.some((r) => r.id === s.id)
+          ? prev
+          : [...prev, { id: s.id, label: s.nextRouteLabel! }],
+      )
+      setToast(`Added ${s.nextRouteLabel} to plan`)
+    } else if (s.kind === 'tip') {
+      setSchedule((prev) => ({
+        ...prev,
+        fri: { ...prev.fri, enabled: true, leadTimeHours: 16 },
+      }))
+      setToast('Friday lead time set to 16 hrs')
+    } else {
+      setToast(`Applied: ${s.title}`)
     }
-    setToast(s.actionLabel === 'Assign driver' ? 'Assigned from suggestion' : `Applied: ${s.title}`)
     setDirty(true)
   }
 
   function save() {
     setDirty(false)
     setToast('Route configuration saved')
+  }
+
+  function discard() {
+    if (!activeTemplate) {
+      setDirty(false)
+      return
+    }
+    setEnabled(activeTemplate.settings['auto-accept'].autoAccept)
+    setSchedule(scheduleFromTemplate(activeTemplate))
+    setAssignedDriver(leg.driver ?? 'Unassigned')
+    setPlannedRoutes([])
+    setApplied([])
+    setCustomers([{ id: leg.customerId, name: leg.customer, tag: leg.tag }])
+    setDirty(false)
+    setToast('Changes discarded')
   }
 
   return (
@@ -194,7 +373,7 @@ export default function RouteConfigPage({
           <h1>Route configuration</h1>
           <span className="rc-top-sep" />
           <p className="rc-top-context">
-            {primary?.name}
+            {board.shortName}
             <em>
               {leg.start.kind} → {leg.end.kind}
             </em>
@@ -202,7 +381,7 @@ export default function RouteConfigPage({
         </div>
         <div className="rc-top-actions">
           {dirty && <span className="rc-dirty">Unsaved</span>}
-          <button type="button" className="rc-btn ghost" disabled={!dirty} onClick={() => setDirty(false)}>
+          <button type="button" className="rc-btn ghost" disabled={!dirty} onClick={discard}>
             Discard
           </button>
           <button type="button" className="rc-btn primary" disabled={!dirty} onClick={save}>
@@ -212,6 +391,93 @@ export default function RouteConfigPage({
       </header>
 
       <div className="rc-shell">
+        <aside className="rc-board-rail" aria-label="Planning boards">
+          <div className="rc-rail-panel dark">
+            <div className="rc-rail-head">
+              <h2>Boards</h2>
+              <span>{BOARDS.length}</span>
+            </div>
+            <div className="rc-rail-search dark">
+              <Search size={13} />
+              <input
+                value={boardQuery}
+                onChange={(e) => setBoardQuery(e.target.value)}
+                placeholder="Search…"
+              />
+            </div>
+            <ul className="rc-rail-list">
+              {filteredBoards.map((b) => (
+                <li key={b.id}>
+                  <button
+                    type="button"
+                    className={b.id === selectedBoardId ? 'is-active' : ''}
+                    onClick={() => switchBoard(b.id)}
+                    title={b.name}
+                  >
+                    <span className="rc-rail-top">
+                      <strong>{b.shortName}</strong>
+                      <em>{b.legCount}</em>
+                    </span>
+                    <span className="rc-rail-meta">{b.region}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+
+        <aside className="rc-template-rail" aria-label="Configuration templates">
+          <div className="rc-rail-panel">
+            <div className="rc-rail-head">
+              <div>
+                <p className="rc-rail-kicker">Selected board</p>
+                <h2>{board.shortName}</h2>
+              </div>
+              <div className="rc-rail-actions">
+                <span className="rc-rail-badge">{templates.length}</span>
+                <button type="button" className="rc-rail-icon" onClick={addTemplate} title="New template">
+                  <Plus size={14} />
+                </button>
+                <button
+                  type="button"
+                  className="rc-rail-icon"
+                  onClick={duplicateTemplate}
+                  title="Duplicate selected"
+                >
+                  <Copy size={13} />
+                </button>
+              </div>
+            </div>
+            <div className="rc-rail-search">
+              <Search size={13} />
+              <input
+                value={templateQuery}
+                onChange={(e) => setTemplateQuery(e.target.value)}
+                placeholder="Search…"
+              />
+            </div>
+            <ul className="rc-rail-list">
+              {filteredTemplates.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    className={t.id === activeTemplate?.id ? 'is-active' : ''}
+                    onClick={() => switchTemplate(t.id)}
+                  >
+                    <span className="rc-rail-top">
+                      <strong>{t.name}</strong>
+                      <span className={`rc-status ${t.active ? 'is-active' : ''}`}>
+                        {t.active ? 'Active' : 'Inactive'}
+                      </span>
+                    </span>
+                    <span className="rc-rail-meta">{formatCreated(t.meta.createdAt)}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+
         <main className="rc-main">
           <section className="rc-context">
             <div className="rc-context-block">
@@ -273,7 +539,7 @@ export default function RouteConfigPage({
               <div className="rc-label-row">
                 <span>Selected route</span>
                 <em>
-                  {boardId} · {leg.miles.toFixed(1)} mi
+                  {activeTemplate?.name ?? 'Template'} · {leg.miles.toFixed(1)} mi
                 </em>
               </div>
               <div className="rc-route-visual">
@@ -306,8 +572,21 @@ export default function RouteConfigPage({
               <div className="rc-meta">
                 <span>{leg.equipment}</span>
                 <span>{leg.assigned}</span>
-                <span>{leg.driver ?? 'Unassigned'}</span>
+                <span className={assignedDriver !== 'Unassigned' ? 'is-assigned' : ''}>
+                  {assignedDriver}
+                </span>
               </div>
+              {plannedRoutes.length > 0 && (
+                <div className="rc-planned">
+                  <span className="rc-planned-label">Added to plan</span>
+                  {plannedRoutes.map((r) => (
+                    <span key={r.id} className="rc-planned-chip">
+                      <RouteIcon size={12} />
+                      {r.label}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           </section>
 
