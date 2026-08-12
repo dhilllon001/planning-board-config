@@ -10,7 +10,7 @@
   --rc-green: #15803d;
   --rc-orange: #c2410c;
   --rc-amber: #b45309;
-  --rc-board-w: 10%;
+  --rc-board-w: 15%;
   --rc-template-w: 15%;
   --rc-font: var(--font-sans, Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   --rc-fs: 12px;
@@ -152,7 +152,7 @@
   min-height: 0;
   display: grid;
   grid-template-columns:
-    minmax(140px, var(--rc-board-w))
+    minmax(160px, var(--rc-board-w))
     minmax(180px, var(--rc-template-w))
     minmax(0, 1fr);
 }
