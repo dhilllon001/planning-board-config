@@ -572,14 +572,109 @@ button {
   flex-shrink: 0;
 }
 
-.center-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  padding: 14px 2px 24px;
+.center-scroll.workflow {
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.flow-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(21, 32, 43, 0.04);
+  overflow: hidden;
+}
+
+.flow-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+  background: #fafbfc;
+}
+
+.flow-step {
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: var(--action);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 750;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+.flow-card-head h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--fg-1);
+}
+
+.flow-card-head p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--fg-3);
+  line-height: 1.35;
+}
+
+.flow-card-body {
+  padding: 14px 16px 16px;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 14px;
+  align-items: end;
+}
+
+.active-inline {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-soft);
+}
+
+.aa-editor,
+.nested-editor {
   display: flex;
   flex-direction: column;
+  gap: 12px;
+}
+
+.master-card.flat {
+  box-shadow: none;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+
+.master-card.flat h4 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.leg-panel.flat {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: none;
+}
+
+.panel-body.tight {
+  padding: 14px;
   gap: 14px;
+}
+
+.customer-list {
+  max-height: 220px;
 }
 
 .meta-sidebar {
@@ -1432,6 +1527,10 @@ button {
 
   .page-actions .btn {
     flex: 1;
+  }
+
+  .identity-grid {
+    grid-template-columns: 1fr;
   }
 
   .template-identity {

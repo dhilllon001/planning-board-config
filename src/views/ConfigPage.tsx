@@ -1,6 +1,5 @@
 import {
   ArrowLeft,
-  Bell,
   Check,
   Copy,
   MapPin,
@@ -8,28 +7,23 @@ import {
   RefreshCw,
   Search,
   Settings2,
-  ShieldCheck,
-  Users,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ALL_DAYS,
   BOARDS,
-  CONFIG_SECTIONS,
   CURRENT_USER,
   CUSTOMERS,
   LEG_META,
   REGIONS,
   createEmptyTemplate,
   createTemplatesForBoard,
-  sectionLabel,
 } from '../data/seed'
 import type {
   AutoAcceptSettings,
   ConfigHistoryEntry,
   ConfigMeta,
-  ConfigSectionId,
   ConfigTemplate,
   CustomerMode,
   CustomerSettings,
@@ -256,7 +250,6 @@ export default function ConfigPage({
     [startBoardId]: createTemplatesForBoard(startBoardId),
   }))
   const [templateId, setTemplateId] = useState(() => createTemplatesForBoard(startBoardId)[0].id)
-  const [section, setSection] = useState<ConfigSectionId>('auto-accept')
   const [draft, setDraft] = useState<ConfigTemplate>(() =>
     clone(createTemplatesForBoard(startBoardId)[0]),
   )
@@ -273,7 +266,6 @@ export default function ConfigPage({
   const settingsDirty = !equal(draft.settings, savedTemplate.settings)
   const identityDirty = draft.name !== savedTemplate.name
   const dirty = settingsDirty || identityDirty || draft.active !== savedTemplate.active
-  const sectionMeta = CONFIG_SECTIONS.find((c) => c.id === section)!
 
   useEffect(() => {
     if (!toast) return
@@ -294,7 +286,6 @@ export default function ConfigPage({
     setTemplateId(tmpl.id)
     setDraft(clone(tmpl))
     setSaveReason('')
-    setSection('auto-accept')
     setActiveLeg('pickup')
     setCustomerQuery('')
     setTemplateQuery('')
@@ -374,7 +365,6 @@ export default function ConfigPage({
     setTemplateId(created.id)
     setDraft(clone(created))
     setSaveReason('')
-    setSection('auto-accept')
     setToast('New template created — edit settings and save')
   }
 
@@ -572,22 +562,15 @@ export default function ConfigPage({
           </div>
         </aside>
 
-        <main className="main-pane">
+          <main className="main-pane">
           <div className="page-header">
             <div>
-              <p className="eyebrow">Configuration template</p>
+              <p className="eyebrow">Lane configuration</p>
               <h2>{draft.name}</h2>
+              {legLabel && <p className="page-sub">{legLabel}</p>}
             </div>
             <div className="page-actions">
-              {dirty && (
-                <span className="dirty-pill">
-                  {settingsDirty && identityDirty
-                    ? '2 changes'
-                    : settingsDirty
-                      ? 'Settings changed'
-                      : 'Details changed'}
-                </span>
-              )}
+              {dirty && <span className="dirty-pill">Unsaved</span>}
               <button type="button" className="btn ghost" disabled={!dirty} onClick={reset}>
                 Discard
               </button>
@@ -597,94 +580,111 @@ export default function ConfigPage({
                 disabled={!dirty || !saveReason.trim()}
                 onClick={save}
               >
-                Save template
+                Save
               </button>
             </div>
           </div>
 
-          <div className="template-identity panel">
-            <label className="field">
-              <span className="field-label">Template name</span>
-              <input
-                className="text-input"
-                value={draft.name}
-                onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
-              />
-            </label>
-            <div className="field-row between active-row">
-              <div>
-                <h4>Active on this board</h4>
-                <p className="field-help">Only one template can be active per board.</p>
+          <div className="center-scroll workflow">
+            <section className="flow-card">
+              <div className="flow-card-head">
+                <span className="flow-step">1</span>
+                <div>
+                  <h3>Template</h3>
+                  <p>Name this lane config and set whether it is active on the board.</p>
+                </div>
               </div>
-              <Toggle
-                checked={draft.active}
-                onChange={(active) => setDraft((prev) => ({ ...prev, active }))}
-              />
-            </div>
-          </div>
+              <div className="flow-card-body identity-grid">
+                <label className="field">
+                  <span className="field-label">Name</span>
+                  <input
+                    className="text-input"
+                    value={draft.name}
+                    onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
+                  />
+                </label>
+                <div className="field-row between active-inline">
+                  <div>
+                    <h4>Active</h4>
+                    <p className="field-help">Only one active template per board.</p>
+                  </div>
+                  <Toggle
+                    checked={draft.active}
+                    onChange={(active) => setDraft((prev) => ({ ...prev, active }))}
+                  />
+                </div>
+              </div>
+            </section>
 
-          <div className="config-type-bar" role="tablist" aria-label="Template settings">
-            {CONFIG_SECTIONS.map((item) => {
-              const Icon =
-                item.id === 'auto-accept'
-                  ? ShieldCheck
-                  : item.id === 'customers'
-                    ? Users
-                    : item.id === 'regions'
-                      ? MapPin
-                      : Bell
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={section === item.id}
-                  className={section === item.id ? 'is-active' : ''}
-                  onClick={() => setSection(item.id)}
-                >
-                  <Icon size={14} />
-                  {item.label}
-                </button>
-              )
-            })}
-          </div>
+            <section className="flow-card">
+              <div className="flow-card-head">
+                <span className="flow-step">2</span>
+                <div>
+                  <h3>Auto Accept</h3>
+                  <p>Master switch and per-leg rules for pickup, delivery, and movement.</p>
+                </div>
+              </div>
+              <div className="flow-card-body">
+                <AutoAcceptEditor
+                  draft={draft.settings['auto-accept']}
+                  setDraft={(fn) => updateSettings('auto-accept', fn)}
+                  activeLeg={activeLeg}
+                  setActiveLeg={setActiveLeg}
+                  regionOptions={regionOptions}
+                />
+              </div>
+            </section>
 
-          <p className="type-blurb">
-            {sectionMeta.description} Each template keeps its own {sectionLabel(section).toLowerCase()}{' '}
-            settings.
-          </p>
+            <section className="flow-card">
+              <div className="flow-card-head">
+                <span className="flow-step">3</span>
+                <div>
+                  <h3>Customers</h3>
+                  <p>Include or exclude customers for this lane config.</p>
+                </div>
+              </div>
+              <div className="flow-card-body">
+                <CustomersEditor
+                  draft={draft.settings.customers}
+                  setDraft={(fn) => updateSettings('customers', fn)}
+                  customerQuery={customerQuery}
+                  setCustomerQuery={setCustomerQuery}
+                />
+              </div>
+            </section>
 
-          <div className="center-scroll">
-            {section === 'auto-accept' && (
-              <AutoAcceptEditor
-                draft={draft.settings['auto-accept']}
-                setDraft={(fn) => updateSettings('auto-accept', fn)}
-                activeLeg={activeLeg}
-                setActiveLeg={setActiveLeg}
-                regionOptions={regionOptions}
-              />
-            )}
-            {section === 'customers' && (
-              <CustomersEditor
-                draft={draft.settings.customers}
-                setDraft={(fn) => updateSettings('customers', fn)}
-                customerQuery={customerQuery}
-                setCustomerQuery={setCustomerQuery}
-              />
-            )}
-            {section === 'regions' && (
-              <RegionsEditor
-                draft={draft.settings.regions}
-                setDraft={(fn) => updateSettings('regions', fn)}
-                regionOptions={regionOptions}
-              />
-            )}
-            {section === 'notifications' && (
-              <NotificationsEditor
-                draft={draft.settings.notifications}
-                setDraft={(fn) => updateSettings('notifications', fn)}
-              />
-            )}
+            <section className="flow-card">
+              <div className="flow-card-head">
+                <span className="flow-step">4</span>
+                <div>
+                  <h3>Regions</h3>
+                  <p>Default start, finish, and allowed coverage regions.</p>
+                </div>
+              </div>
+              <div className="flow-card-body">
+                <RegionsEditor
+                  draft={draft.settings.regions}
+                  setDraft={(fn) => updateSettings('regions', fn)}
+                  regionOptions={regionOptions}
+                />
+              </div>
+            </section>
+
+            <section className="flow-card">
+              <div className="flow-card-head">
+                <span className="flow-step">5</span>
+                <div>
+                  <h3>Notifications</h3>
+                  <p>Email and Slack alerts when this config changes or fires.</p>
+                </div>
+              </div>
+              <div className="flow-card-body">
+                <NotificationsEditor
+                  draft={draft.settings.notifications}
+                  setDraft={(fn) => updateSettings('notifications', fn)}
+                />
+              </div>
+            </section>
           </div>
         </main>
 
@@ -761,22 +761,22 @@ function AutoAcceptEditor({
   }
 
   return (
-    <>
-      <section className={`master-card ${draft.autoAccept ? 'is-on' : 'is-off'}`}>
+    <div className="aa-editor">
+      <div className={`master-card flat ${draft.autoAccept ? 'is-on' : 'is-off'}`}>
         <div className="master-copy">
           <div className="master-badge">{draft.autoAccept ? 'ON' : 'OFF'}</div>
           <div>
-            <h3>Auto Accept</h3>
-            <p>Master toggle for this template. When off, all per-leg rules are ignored.</p>
+            <h4>Enable auto accept</h4>
+            <p>When off, all per-leg rules below are ignored.</p>
           </div>
         </div>
         <Toggle
           checked={draft.autoAccept}
           onChange={(autoAccept) => setDraft((prev) => ({ ...prev, autoAccept }))}
         />
-      </section>
+      </div>
 
-      <section className={`panel leg-panel ${masterOff ? 'is-dimmed' : ''}`}>
+      <div className={`leg-panel flat ${masterOff ? 'is-dimmed' : ''}`}>
         <div className="leg-tabs" role="tablist">
           {LEG_TYPES.map((type) => {
             const meta = LEG_META[type]
@@ -801,10 +801,10 @@ function AutoAcceptEditor({
           })}
         </div>
 
-        <div className="panel-body">
+        <div className="panel-body tight">
           <div className="field-row between">
             <div>
-              <h4>{LEG_META[activeLeg].label} auto accept</h4>
+              <h4>{LEG_META[activeLeg].label}</h4>
               <p className="field-help">{LEG_META[activeLeg].description}</p>
             </div>
             <Toggle
@@ -818,8 +818,8 @@ function AutoAcceptEditor({
             <label className="field">
               <span className="field-label">Lead time</span>
               <span className="field-help">
-                Only auto-accept when the leg is at least this far out. Example:{' '}
-                {formatLead(leg.leadTimeHours)}.
+                Auto-accept only when the leg is at least this far out ({formatLead(leg.leadTimeHours)}
+                ).
               </span>
               <div className="lead-row">
                 <input
@@ -849,7 +849,7 @@ function AutoAcceptEditor({
             </label>
 
             <div className="field">
-              <span className="field-label">Time of day window</span>
+              <span className="field-label">Time of day</span>
               <div className="time-row">
                 <label>
                   Start
@@ -911,7 +911,7 @@ function AutoAcceptEditor({
                   />
                 </label>
                 <label>
-                  Intermediate stops
+                  Intermediate
                   <ChipSelect
                     options={regionOptions}
                     selected={leg.regions.intermediate}
@@ -923,8 +923,8 @@ function AutoAcceptEditor({
             </div>
           </div>
         </div>
-      </section>
-    </>
+      </div>
+    </div>
   )
 }
 
@@ -946,61 +946,56 @@ function CustomersEditor({
   })
 
   return (
-    <section className="panel editor-panel">
-      <div className="panel-body">
-        <h3>Customer include / exclude</h3>
-        <p className="field-help">Scope this template to specific customers.</p>
-
-        <div className="mode-toggle" role="group" aria-label="Customer filter mode">
-          {(['include', 'exclude'] as CustomerMode[]).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              className={draft.customerMode === mode ? 'is-active' : ''}
-              onClick={() => setDraft((prev) => ({ ...prev, customerMode: mode }))}
-            >
-              {mode === 'include' ? 'Include only' : 'Exclude listed'}
-            </button>
-          ))}
-        </div>
-
-        <div className="customer-box flush">
-          <div className="customer-search">
-            <Search size={14} />
-            <input
-              value={customerQuery}
-              onChange={(e) => setCustomerQuery(e.target.value)}
-              placeholder="Search customers…"
-            />
-          </div>
-          <ul className="customer-list">
-            {visibleCustomers.map((c) => {
-              const checked = draft.customers.includes(c.id)
-              return (
-                <li key={c.id}>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() =>
-                        setDraft((prev) => ({
-                          ...prev,
-                          customers: checked
-                            ? prev.customers.filter((id) => id !== c.id)
-                            : [...prev.customers, c.id],
-                        }))
-                      }
-                    />
-                    <span className="customer-name">{c.name}</span>
-                    <span className="customer-tag">{c.tag}</span>
-                  </label>
-                </li>
-              )
-            })}
-          </ul>
-        </div>
+    <div className="nested-editor">
+      <div className="mode-toggle" role="group" aria-label="Customer filter mode">
+        {(['include', 'exclude'] as CustomerMode[]).map((mode) => (
+          <button
+            key={mode}
+            type="button"
+            className={draft.customerMode === mode ? 'is-active' : ''}
+            onClick={() => setDraft((prev) => ({ ...prev, customerMode: mode }))}
+          >
+            {mode === 'include' ? 'Include only' : 'Exclude listed'}
+          </button>
+        ))}
       </div>
-    </section>
+
+      <div className="customer-box flush">
+        <div className="customer-search">
+          <Search size={14} />
+          <input
+            value={customerQuery}
+            onChange={(e) => setCustomerQuery(e.target.value)}
+            placeholder="Search customers…"
+          />
+        </div>
+        <ul className="customer-list">
+          {visibleCustomers.map((c) => {
+            const checked = draft.customers.includes(c.id)
+            return (
+              <li key={c.id}>
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() =>
+                      setDraft((prev) => ({
+                        ...prev,
+                        customers: checked
+                          ? prev.customers.filter((id) => id !== c.id)
+                          : [...prev.customers, c.id],
+                      }))
+                    }
+                  />
+                  <span className="customer-name">{c.name}</span>
+                  <span className="customer-tag">{c.tag}</span>
+                </label>
+              </li>
+            )
+          })}
+        </ul>
+      </div>
+    </div>
   )
 }
 
@@ -1014,40 +1009,35 @@ function RegionsEditor({
   regionOptions: { id: string; label: string; hint?: string }[]
 }) {
   return (
-    <section className="panel editor-panel">
-      <div className="panel-body">
-        <h3>Template region defaults</h3>
-        <div className="region-grid">
-          <label>
-            Default start regions
-            <ChipSelect
-              options={regionOptions}
-              selected={draft.defaultStart}
-              onChange={(defaultStart) => setDraft((prev) => ({ ...prev, defaultStart }))}
-              placeholder="Select start regions"
-            />
-          </label>
-          <label>
-            Default finish regions
-            <ChipSelect
-              options={regionOptions}
-              selected={draft.defaultFinish}
-              onChange={(defaultFinish) => setDraft((prev) => ({ ...prev, defaultFinish }))}
-              placeholder="Select finish regions"
-            />
-          </label>
-          <label>
-            Allowed regions
-            <ChipSelect
-              options={regionOptions}
-              selected={draft.allowedRegions}
-              onChange={(allowedRegions) => setDraft((prev) => ({ ...prev, allowedRegions }))}
-              placeholder="Select allowed regions"
-            />
-          </label>
-        </div>
-      </div>
-    </section>
+    <div className="nested-editor region-grid">
+      <label>
+        Default start regions
+        <ChipSelect
+          options={regionOptions}
+          selected={draft.defaultStart}
+          onChange={(defaultStart) => setDraft((prev) => ({ ...prev, defaultStart }))}
+          placeholder="Select start regions"
+        />
+      </label>
+      <label>
+        Default finish regions
+        <ChipSelect
+          options={regionOptions}
+          selected={draft.defaultFinish}
+          onChange={(defaultFinish) => setDraft((prev) => ({ ...prev, defaultFinish }))}
+          placeholder="Select finish regions"
+        />
+      </label>
+      <label>
+        Allowed regions
+        <ChipSelect
+          options={regionOptions}
+          selected={draft.allowedRegions}
+          onChange={(allowedRegions) => setDraft((prev) => ({ ...prev, allowedRegions }))}
+          placeholder="Select allowed regions"
+        />
+      </label>
+    </div>
   )
 }
 
@@ -1061,68 +1051,65 @@ function NotificationsEditor({
   const roles = ['Ops Admin', 'Dispatch Lead', 'Planner', 'Board Owner']
 
   return (
-    <section className="panel editor-panel">
-      <div className="panel-body">
-        <h3>Notification preferences</h3>
-        <div className="notify-rows">
-          <div className="field-row between">
-            <div>
-              <h4>Email on save</h4>
-              <p className="field-help">Notify watchers when this template is saved.</p>
-            </div>
-            <Toggle
-              checked={draft.emailOnSave}
-              onChange={(emailOnSave) => setDraft((prev) => ({ ...prev, emailOnSave }))}
-            />
+    <div className="nested-editor">
+      <div className="notify-rows">
+        <div className="field-row between">
+          <div>
+            <h4>Email on save</h4>
+            <p className="field-help">Notify watchers when this template is saved.</p>
           </div>
-          <div className="field-row between">
-            <div>
-              <h4>Email on auto accept</h4>
-              <p className="field-help">Send an email when a leg is auto-accepted.</p>
-            </div>
-            <Toggle
-              checked={draft.emailOnAutoAccept}
-              onChange={(emailOnAutoAccept) => setDraft((prev) => ({ ...prev, emailOnAutoAccept }))}
-            />
-          </div>
-        </div>
-
-        <label className="field">
-          <span className="field-label">Slack channel</span>
-          <input
-            className="text-input"
-            value={draft.slackChannel}
-            onChange={(e) => setDraft((prev) => ({ ...prev, slackChannel: e.target.value }))}
-            placeholder="#channel"
+          <Toggle
+            checked={draft.emailOnSave}
+            onChange={(emailOnSave) => setDraft((prev) => ({ ...prev, emailOnSave }))}
           />
-        </label>
-
-        <div className="field">
-          <span className="field-label">Notify roles</span>
-          <div className="role-chips">
-            {roles.map((role) => {
-              const on = draft.notifyRoles.includes(role)
-              return (
-                <button
-                  key={role}
-                  type="button"
-                  className={on ? 'is-on' : ''}
-                  onClick={() =>
-                    setDraft((prev) => ({
-                      ...prev,
-                      notifyRoles: on
-                        ? prev.notifyRoles.filter((r) => r !== role)
-                        : [...prev.notifyRoles, role],
-                    }))
-                  }
-                >
-                  {role}
-                </button>
-              )
-            })}
+        </div>
+        <div className="field-row between">
+          <div>
+            <h4>Email on auto accept</h4>
+            <p className="field-help">Send an email when a leg is auto-accepted.</p>
           </div>
+          <Toggle
+            checked={draft.emailOnAutoAccept}
+            onChange={(emailOnAutoAccept) => setDraft((prev) => ({ ...prev, emailOnAutoAccept }))}
+          />
         </div>
       </div>
-    </section>
+
+      <label className="field">
+        <span className="field-label">Slack channel</span>
+        <input
+          className="text-input"
+          value={draft.slackChannel}
+          onChange={(e) => setDraft((prev) => ({ ...prev, slackChannel: e.target.value }))}
+          placeholder="#channel"
+        />
+      </label>
+
+      <div className="field">
+        <span className="field-label">Notify roles</span>
+        <div className="role-chips">
+          {roles.map((role) => {
+            const on = draft.notifyRoles.includes(role)
+            return (
+              <button
+                key={role}
+                type="button"
+                className={on ? 'is-on' : ''}
+                onClick={() =>
+                  setDraft((prev) => ({
+                    ...prev,
+                    notifyRoles: on
+                      ? prev.notifyRoles.filter((r) => r !== role)
+                      : [...prev.notifyRoles, role],
+                  }))
+                }
+              >
+                {role}
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    </div>
   )
 }
