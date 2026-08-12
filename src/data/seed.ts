@@ -7,10 +7,11 @@ import type {
   CustomerOption,
   CustomerSettings,
   DayKey,
-  LegTypeConfig,
+  LegType,
   NotificationSettings,
   RegionOption,
   RegionSettings,
+  RouteLegConfig,
   TemplateSettings,
   UserRef,
 } from '../types'
@@ -152,8 +153,13 @@ export const LEG_META = {
 const WEEKDAYS: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri']
 const ALL_WEEK: DayKey[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun']
 
-function defaultLeg(partial?: Partial<LegTypeConfig>): LegTypeConfig {
+export function createRouteLeg(
+  type: LegType,
+  partial?: Partial<Omit<RouteLegConfig, 'type'>>,
+): RouteLegConfig {
   return {
+    id: `leg-${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+    type,
     enabled: true,
     leadTimeHours: 12,
     timeOfDay: { start: '06:00', end: '18:00' },
@@ -207,10 +213,11 @@ function makeMeta(
 }
 
 function defaultAutoAccept(overrides?: Partial<AutoAcceptSettings>): AutoAcceptSettings {
-  return {
+  const base: AutoAcceptSettings = {
     autoAccept: true,
-    legs: {
-      pickup: defaultLeg({
+    routeLegs: [
+      createRouteLeg('pickup', {
+        id: 'leg-pickup-default',
         leadTimeHours: 12,
         timeOfDay: { start: '06:00', end: '18:00' },
         daysAllowed: [...WEEKDAYS],
@@ -220,7 +227,8 @@ function defaultAutoAccept(overrides?: Partial<AutoAcceptSettings>): AutoAcceptS
           intermediate: [],
         },
       }),
-      delivery: defaultLeg({
+      createRouteLeg('delivery', {
+        id: 'leg-delivery-default',
         leadTimeHours: 8,
         timeOfDay: { start: '07:00', end: '17:00' },
         daysAllowed: [...WEEKDAYS],
@@ -230,18 +238,12 @@ function defaultAutoAccept(overrides?: Partial<AutoAcceptSettings>): AutoAcceptS
           intermediate: ['r-midwest'],
         },
       }),
-      movement: defaultLeg({
-        leadTimeHours: 4,
-        timeOfDay: { start: '00:00', end: '23:59' },
-        daysAllowed: [...ALL_WEEK],
-        regions: {
-          start: ['r-midwest'],
-          finish: ['r-east', 'r-west'],
-          intermediate: [],
-        },
-      }),
-    },
+    ],
+  }
+  return {
+    ...base,
     ...overrides,
+    routeLegs: overrides?.routeLegs ?? base.routeLegs,
   }
 }
 
@@ -331,29 +333,29 @@ export function createTemplatesForBoard(boardId: string): ConfigTemplate[] {
       {
         auto: {
           autoAccept: true,
-          legs: {
-            pickup: defaultLeg({
-              enabled: true,
+          routeLegs: [
+            createRouteLeg('pickup', {
+              id: `${boardId}-wk-pickup`,
               leadTimeHours: 18,
               timeOfDay: { start: '08:00', end: '16:00' },
               daysAllowed: ['sat', 'sun'],
               regions: { start: ['r-midwest'], finish: ['r-east'], intermediate: [] },
             }),
-            delivery: defaultLeg({
-              enabled: true,
+            createRouteLeg('delivery', {
+              id: `${boardId}-wk-delivery`,
               leadTimeHours: 14,
               timeOfDay: { start: '08:00', end: '16:00' },
               daysAllowed: ['sat', 'sun'],
               regions: { start: ['r-east'], finish: ['r-midwest'], intermediate: [] },
             }),
-            movement: defaultLeg({
-              enabled: true,
+            createRouteLeg('movement', {
+              id: `${boardId}-wk-movement`,
               leadTimeHours: 6,
               timeOfDay: { start: '00:00', end: '23:59' },
               daysAllowed: [...ALL_WEEK],
               regions: { start: ['r-midwest'], finish: ['r-west'], intermediate: [] },
             }),
-          },
+          ],
         },
         notifications: {
           emailOnAutoAccept: true,

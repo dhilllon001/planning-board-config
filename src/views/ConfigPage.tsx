@@ -1,12 +1,14 @@
 import {
   ArrowLeft,
   Check,
+  ChevronDown,
   Copy,
   MapPin,
   Plus,
   RefreshCw,
   Search,
   Settings2,
+  Trash2,
   X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -18,6 +20,7 @@ import {
   LEG_META,
   REGIONS,
   createEmptyTemplate,
+  createRouteLeg,
   createTemplatesForBoard,
 } from '../data/seed'
 import type {
@@ -32,6 +35,7 @@ import type {
   NotificationSettings,
   RegionRule,
   RegionSettings,
+  RouteLegConfig,
   TemplateSettings,
   UserRef,
 } from '../types'
@@ -46,13 +50,6 @@ function clone<T>(value: T): T {
 
 function equal(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b)
-}
-
-function formatLead(hours: number): string {
-  if (hours < 24) return `${hours} hrs`
-  const days = Math.floor(hours / 24)
-  const rem = hours % 24
-  return rem ? `${days}d ${rem}h` : `${days} days`
 }
 
 function formatWhen(iso: string): string {
@@ -254,7 +251,6 @@ export default function ConfigPage({
     clone(createTemplatesForBoard(startBoardId)[0]),
   )
   const [saveReason, setSaveReason] = useState('')
-  const [activeLeg, setActiveLeg] = useState<LegType>('pickup')
   const [boardQuery, setBoardQuery] = useState('')
   const [templateQuery, setTemplateQuery] = useState('')
   const [customerQuery, setCustomerQuery] = useState('')
@@ -286,7 +282,6 @@ export default function ConfigPage({
     setTemplateId(tmpl.id)
     setDraft(clone(tmpl))
     setSaveReason('')
-    setActiveLeg('pickup')
     setCustomerQuery('')
     setTemplateQuery('')
   }
@@ -591,10 +586,10 @@ export default function ConfigPage({
                 <span className="flow-step">1</span>
                 <div>
                   <h3>Template</h3>
-                  <p>Name this lane config and set whether it is active on the board.</p>
+                  <p>Simple name and active state for this lane config.</p>
                 </div>
               </div>
-              <div className="flow-card-body identity-grid">
+              <div className="flow-card-body identity-simple">
                 <label className="field">
                   <span className="field-label">Name</span>
                   <input
@@ -603,15 +598,24 @@ export default function ConfigPage({
                     onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
                   />
                 </label>
-                <div className="field-row between active-inline">
-                  <div>
-                    <h4>Active</h4>
-                    <p className="field-help">Only one active template per board.</p>
+                <div className="field">
+                  <span className="field-label">Status</span>
+                  <div className="seg-btns">
+                    <button
+                      type="button"
+                      className={draft.active ? 'is-on positive' : ''}
+                      onClick={() => setDraft((prev) => ({ ...prev, active: true }))}
+                    >
+                      Active
+                    </button>
+                    <button
+                      type="button"
+                      className={!draft.active ? 'is-on muted' : ''}
+                      onClick={() => setDraft((prev) => ({ ...prev, active: false }))}
+                    >
+                      Inactive
+                    </button>
                   </div>
-                  <Toggle
-                    checked={draft.active}
-                    onChange={(active) => setDraft((prev) => ({ ...prev, active }))}
-                  />
                 </div>
               </div>
             </section>
@@ -621,15 +625,13 @@ export default function ConfigPage({
                 <span className="flow-step">2</span>
                 <div>
                   <h3>Auto Accept</h3>
-                  <p>Master switch and per-leg rules for pickup, delivery, and movement.</p>
+                  <p>Enable rules, then build the route with pickup / delivery / movement legs.</p>
                 </div>
               </div>
               <div className="flow-card-body">
                 <AutoAcceptEditor
                   draft={draft.settings['auto-accept']}
                   setDraft={(fn) => updateSettings('auto-accept', fn)}
-                  activeLeg={activeLeg}
-                  setActiveLeg={setActiveLeg}
                   regionOptions={regionOptions}
                 />
               </div>
@@ -733,196 +735,268 @@ export default function ConfigPage({
 function AutoAcceptEditor({
   draft,
   setDraft,
-  activeLeg,
-  setActiveLeg,
   regionOptions,
 }: {
   draft: AutoAcceptSettings
   setDraft: (fn: (prev: AutoAcceptSettings) => AutoAcceptSettings) => void
-  activeLeg: LegType
-  setActiveLeg: (leg: LegType) => void
   regionOptions: { id: string; label: string; hint?: string }[]
 }) {
-  const leg = draft.legs[activeLeg]
+  const [openId, setOpenId] = useState<string | null>(draft.routeLegs[0]?.id ?? null)
+  const [addOpen, setAddOpen] = useState(false)
   const masterOff = !draft.autoAccept
 
-  function updateLeg(patch: Partial<typeof leg>) {
+  function updateLeg(id: string, patch: Partial<RouteLegConfig>) {
     setDraft((prev) => ({
       ...prev,
-      legs: {
-        ...prev.legs,
-        [activeLeg]: { ...prev.legs[activeLeg], ...patch },
-      },
+      routeLegs: prev.routeLegs.map((leg) => (leg.id === id ? { ...leg, ...patch } : leg)),
     }))
   }
 
-  function updateRegions(key: keyof RegionRule, next: string[]) {
-    updateLeg({ regions: { ...leg.regions, [key]: next } })
+  function updateRegions(id: string, key: keyof RegionRule, next: string[]) {
+    const leg = draft.routeLegs.find((l) => l.id === id)
+    if (!leg) return
+    updateLeg(id, { regions: { ...leg.regions, [key]: next } })
+  }
+
+  function removeLeg(id: string) {
+    setDraft((prev) => ({
+      ...prev,
+      routeLegs: prev.routeLegs.filter((leg) => leg.id !== id),
+    }))
+    if (openId === id) setOpenId(null)
+  }
+
+  function addLeg(type: LegType) {
+    const leg = createRouteLeg(type)
+    setDraft((prev) => ({
+      ...prev,
+      routeLegs: [...prev.routeLegs, leg],
+    }))
+    setOpenId(leg.id)
+    setAddOpen(false)
   }
 
   return (
     <div className="aa-editor">
-      <div className={`master-card flat ${draft.autoAccept ? 'is-on' : 'is-off'}`}>
-        <div className="master-copy">
-          <div className="master-badge">{draft.autoAccept ? 'ON' : 'OFF'}</div>
-          <div>
-            <h4>Enable auto accept</h4>
-            <p>When off, all per-leg rules below are ignored.</p>
-          </div>
+      <div className="field">
+        <span className="field-label">Enable</span>
+        <div className="seg-btns">
+          <button
+            type="button"
+            className={draft.autoAccept ? 'is-on positive' : ''}
+            onClick={() => setDraft((prev) => ({ ...prev, autoAccept: true }))}
+          >
+            Enable
+          </button>
+          <button
+            type="button"
+            className={!draft.autoAccept ? 'is-on muted' : ''}
+            onClick={() => setDraft((prev) => ({ ...prev, autoAccept: false }))}
+          >
+            Disable
+          </button>
         </div>
-        <Toggle
-          checked={draft.autoAccept}
-          onChange={(autoAccept) => setDraft((prev) => ({ ...prev, autoAccept }))}
-        />
       </div>
 
-      <div className={`leg-panel flat ${masterOff ? 'is-dimmed' : ''}`}>
-        <div className="leg-tabs" role="tablist">
-          {LEG_TYPES.map((type) => {
-            const meta = LEG_META[type]
-            const cfg = draft.legs[type]
-            return (
-              <button
-                key={type}
-                type="button"
-                role="tab"
-                aria-selected={activeLeg === type}
-                className={`leg-tab accent-${meta.accent} ${activeLeg === type ? 'is-active' : ''}`}
-                onClick={() => setActiveLeg(type)}
-                disabled={masterOff}
-              >
-                <span className="leg-tab-code">{meta.short}</span>
-                <span className="leg-tab-label">{meta.label}</span>
-                <span className={`leg-tab-state ${cfg.enabled ? 'on' : 'off'}`}>
-                  {cfg.enabled ? 'ON' : 'OFF'}
-                </span>
-              </button>
-            )
-          })}
-        </div>
-
-        <div className="panel-body tight">
-          <div className="field-row between">
-            <div>
-              <h4>{LEG_META[activeLeg].label}</h4>
-              <p className="field-help">{LEG_META[activeLeg].description}</p>
-            </div>
-            <Toggle
-              checked={leg.enabled}
+      <div className={`route-builder ${masterOff ? 'is-dimmed' : ''}`}>
+        <div className="route-builder-head">
+          <div>
+            <h4>Route legs</h4>
+            <p className="field-help">Build the lane like a route — add pickup, delivery, or movement.</p>
+          </div>
+          <div className="add-leg-wrap">
+            <button
+              type="button"
+              className="add-leg-btn"
               disabled={masterOff}
-              onChange={(enabled) => updateLeg({ enabled })}
-            />
-          </div>
-
-          <div className={`leg-fields ${!leg.enabled || masterOff ? 'is-disabled' : ''}`}>
-            <label className="field">
-              <span className="field-label">Lead time</span>
-              <span className="field-help">
-                Auto-accept only when the leg is at least this far out ({formatLead(leg.leadTimeHours)}
-                ).
-              </span>
-              <div className="lead-row">
-                <input
-                  type="range"
-                  min={1}
-                  max={72}
-                  value={leg.leadTimeHours}
-                  disabled={!leg.enabled || masterOff}
-                  onChange={(e) => updateLeg({ leadTimeHours: Number(e.target.value) })}
-                />
-                <div className="lead-input">
-                  <input
-                    type="number"
-                    min={1}
-                    max={168}
-                    value={leg.leadTimeHours}
-                    disabled={!leg.enabled || masterOff}
-                    onChange={(e) =>
-                      updateLeg({
-                        leadTimeHours: Math.max(1, Math.min(168, Number(e.target.value) || 1)),
-                      })
-                    }
-                  />
-                  <span>hrs</span>
-                </div>
+              onClick={() => setAddOpen((v) => !v)}
+            >
+              <Plus size={14} />
+              Add leg
+            </button>
+            {addOpen && !masterOff && (
+              <div className="add-leg-menu">
+                {LEG_TYPES.map((type) => (
+                  <button key={type} type="button" onClick={() => addLeg(type)}>
+                    <span className={`mini-badge accent-${LEG_META[type].accent}`}>
+                      {LEG_META[type].short}
+                    </span>
+                    {LEG_META[type].label}
+                  </button>
+                ))}
               </div>
-            </label>
-
-            <div className="field">
-              <span className="field-label">Time of day</span>
-              <div className="time-row">
-                <label>
-                  Start
-                  <input
-                    type="time"
-                    value={leg.timeOfDay.start}
-                    disabled={!leg.enabled || masterOff}
-                    onChange={(e) =>
-                      updateLeg({ timeOfDay: { ...leg.timeOfDay, start: e.target.value } })
-                    }
-                  />
-                </label>
-                <span className="time-sep">to</span>
-                <label>
-                  End
-                  <input
-                    type="time"
-                    value={leg.timeOfDay.end}
-                    disabled={!leg.enabled || masterOff}
-                    onChange={(e) =>
-                      updateLeg({ timeOfDay: { ...leg.timeOfDay, end: e.target.value } })
-                    }
-                  />
-                </label>
-              </div>
-            </div>
-
-            <div className="field">
-              <span className="field-label">Days allowed</span>
-              <DayPicker
-                value={leg.daysAllowed}
-                disabled={!leg.enabled || masterOff}
-                onChange={(daysAllowed) => updateLeg({ daysAllowed })}
-              />
-            </div>
-
-            <div className="field region-field">
-              <div className="field-label-row">
-                <MapPin size={14} />
-                <span className="field-label">Regions</span>
-              </div>
-              <div className="region-grid">
-                <label>
-                  Start
-                  <ChipSelect
-                    options={regionOptions}
-                    selected={leg.regions.start}
-                    onChange={(next) => updateRegions('start', next)}
-                    placeholder="Any start region"
-                  />
-                </label>
-                <label>
-                  Finish
-                  <ChipSelect
-                    options={regionOptions}
-                    selected={leg.regions.finish}
-                    onChange={(next) => updateRegions('finish', next)}
-                    placeholder="Any finish region"
-                  />
-                </label>
-                <label>
-                  Intermediate
-                  <ChipSelect
-                    options={regionOptions}
-                    selected={leg.regions.intermediate}
-                    onChange={(next) => updateRegions('intermediate', next)}
-                    placeholder="Optional mid regions"
-                  />
-                </label>
-              </div>
-            </div>
+            )}
           </div>
         </div>
+
+        {draft.routeLegs.length === 0 ? (
+          <button
+            type="button"
+            className="empty-route"
+            disabled={masterOff}
+            onClick={() => setAddOpen(true)}
+          >
+            <Plus size={16} />
+            Click to add the first route leg
+          </button>
+        ) : (
+          <ul className="route-leg-list">
+            {draft.routeLegs.map((leg, index) => {
+              const meta = LEG_META[leg.type]
+              const open = openId === leg.id
+              return (
+                <li key={leg.id} className={`route-leg-card accent-${meta.accent}`}>
+                  {index > 0 && <div className="route-connector" aria-hidden />}
+                  <button
+                    type="button"
+                    className="route-leg-summary"
+                    disabled={masterOff}
+                    onClick={() => setOpenId(open ? null : leg.id)}
+                  >
+                    <span className={`leg-type-pill accent-${meta.accent}`}>{meta.label}</span>
+                    <span className="leg-summary-text">
+                      {leg.enabled ? `${leg.leadTimeHours}h` : 'Off'} · {leg.timeOfDay.start}–
+                      {leg.timeOfDay.end} · {leg.daysAllowed.length}d
+                    </span>
+                    <span className={`leg-onoff ${leg.enabled ? 'on' : 'off'}`}>
+                      {leg.enabled ? 'On' : 'Off'}
+                    </span>
+                    <ChevronDown size={14} className={open ? 'is-open' : ''} />
+                  </button>
+
+                  {open && (
+                    <div className="route-leg-body">
+                      <div className="field">
+                        <span className="field-label">Leg enable</span>
+                        <div className="seg-btns compact">
+                          <button
+                            type="button"
+                            className={leg.enabled ? 'is-on positive' : ''}
+                            disabled={masterOff}
+                            onClick={() => updateLeg(leg.id, { enabled: true })}
+                          >
+                            Enable
+                          </button>
+                          <button
+                            type="button"
+                            className={!leg.enabled ? 'is-on muted' : ''}
+                            disabled={masterOff}
+                            onClick={() => updateLeg(leg.id, { enabled: false })}
+                          >
+                            Disable
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className={`leg-fields ${!leg.enabled || masterOff ? 'is-disabled' : ''}`}>
+                        <label className="field">
+                          <span className="field-label">Lead time (hrs)</span>
+                          <div className="lead-input wide">
+                            <input
+                              type="number"
+                              min={1}
+                              max={168}
+                              value={leg.leadTimeHours}
+                              disabled={!leg.enabled || masterOff}
+                              onChange={(e) =>
+                                updateLeg(leg.id, {
+                                  leadTimeHours: Math.max(
+                                    1,
+                                    Math.min(168, Number(e.target.value) || 1),
+                                  ),
+                                })
+                              }
+                            />
+                            <span>hrs</span>
+                          </div>
+                        </label>
+
+                        <div className="field">
+                          <span className="field-label">Time of day</span>
+                          <div className="time-row">
+                            <label>
+                              Start
+                              <input
+                                type="time"
+                                value={leg.timeOfDay.start}
+                                disabled={!leg.enabled || masterOff}
+                                onChange={(e) =>
+                                  updateLeg(leg.id, {
+                                    timeOfDay: { ...leg.timeOfDay, start: e.target.value },
+                                  })
+                                }
+                              />
+                            </label>
+                            <span className="time-sep">to</span>
+                            <label>
+                              End
+                              <input
+                                type="time"
+                                value={leg.timeOfDay.end}
+                                disabled={!leg.enabled || masterOff}
+                                onChange={(e) =>
+                                  updateLeg(leg.id, {
+                                    timeOfDay: { ...leg.timeOfDay, end: e.target.value },
+                                  })
+                                }
+                              />
+                            </label>
+                          </div>
+                        </div>
+
+                        <div className="field">
+                          <span className="field-label">Days</span>
+                          <DayPicker
+                            value={leg.daysAllowed}
+                            disabled={!leg.enabled || masterOff}
+                            onChange={(daysAllowed) => updateLeg(leg.id, { daysAllowed })}
+                          />
+                        </div>
+
+                        <div className="field">
+                          <div className="field-label-row">
+                            <MapPin size={14} />
+                            <span className="field-label">Regions</span>
+                          </div>
+                          <div className="region-grid">
+                            <label>
+                              Start
+                              <ChipSelect
+                                options={regionOptions}
+                                selected={leg.regions.start}
+                                onChange={(next) => updateRegions(leg.id, 'start', next)}
+                                placeholder="Any start"
+                              />
+                            </label>
+                            <label>
+                              Finish
+                              <ChipSelect
+                                options={regionOptions}
+                                selected={leg.regions.finish}
+                                onChange={(next) => updateRegions(leg.id, 'finish', next)}
+                                placeholder="Any finish"
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        className="remove-leg-btn"
+                        disabled={masterOff}
+                        onClick={() => removeLeg(leg.id)}
+                      >
+                        <Trash2 size={13} />
+                        Remove leg
+                      </button>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
     </div>
   )

@@ -17,7 +17,9 @@ export interface RegionRule {
   intermediate: string[]
 }
 
-export interface LegTypeConfig {
+export interface RouteLegConfig {
+  id: string
+  type: LegType
   enabled: boolean
   leadTimeHours: number
   timeOfDay: TimeWindow
@@ -27,7 +29,7 @@ export interface LegTypeConfig {
 
 export interface AutoAcceptSettings {
   autoAccept: boolean
-  legs: Record<LegType, LegTypeConfig>
+  routeLegs: RouteLegConfig[]
 }
 
 export interface CustomerSettings {
