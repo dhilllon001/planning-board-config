@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { BoardLeg } from './data/boardSeed'
 import PlanningBoard from './views/PlanningBoard'
-import ConfigPage from './views/ConfigPage'
+import RouteConfigPage from './views/RouteConfigPage'
 
 type View =
   | { name: 'board' }
@@ -11,11 +11,10 @@ export default function App() {
   const [view, setView] = useState<View>({ name: 'board' })
 
   if (view.name === 'config') {
-    const label = `${view.leg.start.name} → ${view.leg.end.name} · ${view.leg.miles.toFixed(1)} mi`
     return (
-      <ConfigPage
+      <RouteConfigPage
+        leg={view.leg}
         boardId={view.boardId}
-        legLabel={label}
         onBack={() => setView({ name: 'board' })}
       />
     )
