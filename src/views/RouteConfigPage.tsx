@@ -261,9 +261,6 @@ export default function RouteConfigPage({
     setToast('Changes discarded')
   }
 
-  const startLabel = stopMode === 'city' ? leg.start.city : leg.start.name
-  const endLabel = stopMode === 'city' ? leg.end.city : leg.end.name
-
   return (
     <div className="rc">
       <header className="rc-topbar">
@@ -357,15 +354,11 @@ export default function RouteConfigPage({
             <ul className="rc-customers-list">
               {listedCustomers.map((c) => (
                 <li key={c.id}>
-                  <div
-                    className={`rc-customer-row tone-${c.tag.toLowerCase().replace(/\s+/g, '-')} ${allCustomers ? 'is-all' : 'is-selected'}`}
-                  >
-                    <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
+                  <div className={`rc-customer-row ${allCustomers ? 'is-all' : 'is-selected'}`}>
                     <div className="rc-customer-text">
                       <strong>{c.name}</strong>
                       <span>
-                        <em className="rc-tag">{c.tag}</em>
-                        {c.id}
+                        {c.tag} · {c.id}
                       </span>
                     </div>
                     {!allCustomers && customers.length > 1 && (
@@ -418,45 +411,43 @@ export default function RouteConfigPage({
                 </div>
               </div>
 
-              <div className={`rc-route-card mode-${stopMode}`}>
-                <div className="rc-route-stop start">
-                  <div className="rc-stop-row">
-                    <span className={`rc-badge kind-${leg.start.kind.toLowerCase()}`}>
-                      {leg.start.kind}
-                    </span>
-                    <span className="rc-when">{leg.start.when}</span>
+              <div className={`rc-leg-flow mode-${stopMode}`}>
+                <article className={`rc-stop-card kind-${leg.start.kind.toLowerCase()}`}>
+                  <div className="rc-stop-card-top">
+                    <span className="rc-stop-kind">{leg.start.kind}</span>
+                    <span className="rc-stop-time">{leg.start.when}</span>
                   </div>
-                  <strong title={startLabel}>{startLabel}</strong>
-                  {stopMode === 'location' && (
-                    <span className="rc-stop-sub">{leg.start.city}</span>
+                  <h3 title={stopMode === 'location' ? leg.start.name : leg.start.city}>
+                    {stopMode === 'location' ? leg.start.name : leg.start.city}
+                  </h3>
+                  {stopMode === 'location' ? (
+                    <p>{leg.start.city}</p>
+                  ) : (
+                    <p>{leg.start.name}</p>
                   )}
+                  <span className="rc-stop-status">{leg.equipment}</span>
+                </article>
+
+                <div className="rc-leg-connector" aria-hidden="true">
+                  <span className="rc-leg-line" />
+                  <span className="rc-leg-miles">{leg.miles.toFixed(1)} mi</span>
+                  <span className="rc-leg-line" />
                 </div>
 
-                <div className="rc-route-path" aria-hidden="true">
-                  <span className="rc-lamp start" />
-                  <span className="rc-road" />
-                  <span className="rc-miles">{leg.miles.toFixed(1)} mi</span>
-                  <span className="rc-road" />
-                  <span className="rc-lamp end" />
-                </div>
-
-                <div className="rc-route-stop end">
-                  <div className="rc-stop-row end">
-                    <span className="rc-when">{leg.end.when}</span>
-                    <span className={`rc-badge kind-${leg.end.kind.toLowerCase()}`}>
-                      {leg.end.kind}
-                    </span>
+                <article className={`rc-stop-card kind-${leg.end.kind.toLowerCase()}`}>
+                  <div className="rc-stop-card-top">
+                    <span className="rc-stop-kind">{leg.end.kind}</span>
+                    <span className="rc-stop-time">{leg.end.when}</span>
                   </div>
-                  <strong title={endLabel}>{endLabel}</strong>
-                  {stopMode === 'location' && (
-                    <span className="rc-stop-sub">{leg.end.city}</span>
-                  )}
-                </div>
+                  <h3 title={stopMode === 'location' ? leg.end.name : leg.end.city}>
+                    {stopMode === 'location' ? leg.end.name : leg.end.city}
+                  </h3>
+                  {stopMode === 'location' ? <p>{leg.end.city}</p> : <p>{leg.end.name}</p>}
+                  <span className="rc-stop-status end">{leg.assigned}</span>
+                </article>
               </div>
 
               <div className="rc-meta">
-                <span>{leg.equipment}</span>
-                <span>{leg.assigned}</span>
                 <span>{leg.driver ?? 'Unassigned'}</span>
               </div>
             </div>
