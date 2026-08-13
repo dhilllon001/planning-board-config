@@ -26,6 +26,7 @@ interface DaySchedule {
   start: string
   toUnconstrained: boolean
   end: string
+  dailyMaxUnconstrained: boolean
   dailyMax: number
 }
 
@@ -47,6 +48,7 @@ function emptyDay(enabled = false): DaySchedule {
     start: '06:00',
     toUnconstrained: false,
     end: '18:00',
+    dailyMaxUnconstrained: false,
     dailyMax: 6,
   }
 }
@@ -96,10 +98,10 @@ export default function RouteConfigPage({
   const [customers, setCustomers] = useState<SelectedCustomer[]>([
     { id: leg.customerId, name: leg.customer, tag: leg.tag },
   ])
+  const [allCustomers, setAllCustomers] = useState(false)
   const [masterEnabled, setMasterEnabled] = useState(true)
   const [schedule, setSchedule] = useState<ScheduleMap>(() => defaultSchedule())
   const [stopMode, setStopMode] = useState<StopDisplayMode>('city')
-  const [globalDailyMax, setGlobalDailyMax] = useState(6)
   const [globalWeeklyMax, setGlobalWeeklyMax] = useState(30)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -182,7 +184,7 @@ export default function RouteConfigPage({
       leadUnconstrained: true,
       fromUnconstrained: true,
       toUnconstrained: true,
-      dailyMax: globalDailyMax,
+      dailyMaxUnconstrained: true,
     })
     setToast(`Cleared ${DAYS.find((d) => d.key === day)?.label}`)
   }
@@ -197,7 +199,7 @@ export default function RouteConfigPage({
             leadUnconstrained: true,
             fromUnconstrained: true,
             toUnconstrained: true,
-            dailyMax: globalDailyMax,
+            dailyMaxUnconstrained: true,
           },
         ]),
       ) as ScheduleMap,
@@ -206,20 +208,19 @@ export default function RouteConfigPage({
     setToast('Cleared all day configurations')
   }
 
-  function applyGlobalDailyMax(value: number) {
-    const next = Math.max(1, Math.min(99, value || 1))
-    setGlobalDailyMax(next)
-    setSchedule((prev) => {
-      const map = { ...prev }
-      for (const { key } of DAYS) {
-        map[key] = { ...map[key], dailyMax: next, sameAsAbove: false }
-      }
-      return map
-    })
+  function toggleAllCustomers(next: boolean) {
+    setAllCustomers(next)
+    if (next) {
+      setPickerOpen(false)
+      setToast('Applies to all customers')
+    } else if (customers.length === 0) {
+      setCustomers([{ id: leg.customerId, name: leg.customer, tag: leg.tag }])
+    }
     markDirty()
   }
 
   function addCustomer(c: { id: string; name: string; tag: string }) {
+    setAllCustomers(false)
     setCustomers((prev) => [...prev, c])
     setPickerOpen(false)
     markDirty()
@@ -238,10 +239,10 @@ export default function RouteConfigPage({
 
   function discard() {
     setCustomers([{ id: leg.customerId, name: leg.customer, tag: leg.tag }])
+    setAllCustomers(false)
     setMasterEnabled(true)
     setSchedule(defaultSchedule())
     setStopMode('city')
-    setGlobalDailyMax(6)
     setGlobalWeeklyMax(30)
     setDirty(false)
     setToast('Changes discarded')
@@ -283,60 +284,83 @@ export default function RouteConfigPage({
             <div className="rc-context-block">
               <div className="rc-label-row">
                 <span>Selected customers</span>
-                <div className="rc-add-wrap" ref={pickerRef}>
-                  <button
-                    type="button"
-                    className="rc-add-btn"
-                    onClick={() => setPickerOpen((v) => !v)}
-                    title="Add customer"
-                    aria-expanded={pickerOpen}
-                  >
-                    <Plus size={14} />
-                    Add customer
-                  </button>
-                  {pickerOpen && (
-                    <div className="rc-picker">
-                      {availableToAdd.length === 0 ? (
-                        <p className="rc-picker-empty">All customers added</p>
-                      ) : (
-                        availableToAdd.map((c) => (
-                          <button key={c.id} type="button" onClick={() => addCustomer(c)}>
-                            <span className="rc-picker-avatar">{customerInitials(c.name)}</span>
-                            <span className="rc-picker-copy">
-                              <strong>{c.name}</strong>
-                              <em>{c.tag}</em>
-                            </span>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  )}
+                <div className="rc-customer-toolbar">
+                  <label className="rc-all-customers">
+                    <input
+                      type="checkbox"
+                      checked={allCustomers}
+                      onChange={(e) => toggleAllCustomers(e.target.checked)}
+                    />
+                    <span>All customers</span>
+                  </label>
+                  <div className="rc-add-wrap" ref={pickerRef}>
+                    <button
+                      type="button"
+                      className="rc-add-btn"
+                      disabled={allCustomers}
+                      onClick={() => setPickerOpen((v) => !v)}
+                      title="Add customer"
+                      aria-expanded={pickerOpen}
+                    >
+                      <Plus size={14} />
+                      Add customer
+                    </button>
+                    {pickerOpen && !allCustomers && (
+                      <div className="rc-picker">
+                        {availableToAdd.length === 0 ? (
+                          <p className="rc-picker-empty">All customers added</p>
+                        ) : (
+                          availableToAdd.map((c) => (
+                            <button key={c.id} type="button" onClick={() => addCustomer(c)}>
+                              <span className="rc-picker-avatar">{customerInitials(c.name)}</span>
+                              <span className="rc-picker-copy">
+                                <strong>{c.name}</strong>
+                                <em>{c.tag}</em>
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              <div className="rc-customer-list">
-                {customers.map((c) => (
-                  <div key={c.id} className="rc-customer-card">
-                    <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
+              {allCustomers ? (
+                <div className="rc-customer-list">
+                  <div className="rc-customer-card is-all">
+                    <span className="rc-customer-avatar">ALL</span>
                     <div className="rc-customer-text">
-                      <strong>{c.name}</strong>
-                      <span>
-                        {c.id} · {c.tag}
-                      </span>
+                      <strong>All customers</strong>
+                      <span>This configuration applies to every customer</span>
                     </div>
-                    {customers.length > 1 && (
-                      <button
-                        type="button"
-                        className="rc-remove"
-                        aria-label={`Remove ${c.name}`}
-                        onClick={() => removeCustomer(c.id)}
-                      >
-                        <X size={12} />
-                      </button>
-                    )}
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="rc-customer-list">
+                  {customers.map((c) => (
+                    <div key={c.id} className="rc-customer-card">
+                      <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
+                      <div className="rc-customer-text">
+                        <strong>{c.name}</strong>
+                        <span>
+                          {c.id} · {c.tag}
+                        </span>
+                      </div>
+                      {customers.length > 1 && (
+                        <button
+                          type="button"
+                          className="rc-remove"
+                          aria-label={`Remove ${c.name}`}
+                          onClick={() => removeCustomer(c.id)}
+                        >
+                          <X size={12} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="rc-context-block rc-route-block">
@@ -448,21 +472,7 @@ export default function RouteConfigPage({
 
             <div className="rc-global-caps">
               <label className="rc-cap">
-                <span>Global daily max</span>
-                <div className="rc-input">
-                  <input
-                    type="number"
-                    min={1}
-                    max={99}
-                    value={globalDailyMax}
-                    disabled={!masterEnabled}
-                    onChange={(e) => applyGlobalDailyMax(Number(e.target.value))}
-                  />
-                  <em>loads</em>
-                </div>
-              </label>
-              <label className="rc-cap">
-                <span>Global weekly max</span>
+                <span>Weekly max</span>
                 <div className="rc-input">
                   <input
                     type="number"
@@ -604,41 +614,69 @@ export default function RouteConfigPage({
                       />
                     </div>
 
-                    <div className="rc-loads">
-                      <button
-                        type="button"
-                        disabled={
-                          !masterEnabled || !day.enabled || lockedBySame || day.dailyMax <= 1
-                        }
-                        onClick={() =>
-                          updateDay(key, { dailyMax: Math.max(1, day.dailyMax - 1) })
-                        }
-                      >
-                        −
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={day.dailyMax}
-                        disabled={!masterEnabled || !day.enabled || lockedBySame}
-                        onChange={(e) =>
-                          updateDay(key, {
-                            dailyMax: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                          })
-                        }
-                      />
-                      <button
-                        type="button"
-                        disabled={
-                          !masterEnabled || !day.enabled || lockedBySame || day.dailyMax >= 99
-                        }
-                        onClick={() =>
-                          updateDay(key, { dailyMax: Math.min(99, day.dailyMax + 1) })
-                        }
-                      >
-                        +
-                      </button>
+                    <div
+                      className={`rc-constraint rc-constraint-loads ${day.dailyMaxUnconstrained ? 'is-any' : ''}`}
+                    >
+                      <label className="rc-any">
+                        <input
+                          type="checkbox"
+                          checked={day.dailyMaxUnconstrained}
+                          disabled={!masterEnabled || !day.enabled || lockedBySame}
+                          onChange={(e) =>
+                            updateDay(key, { dailyMaxUnconstrained: e.target.checked })
+                          }
+                        />
+                        <span>Any</span>
+                      </label>
+                      <div className="rc-loads">
+                        <button
+                          type="button"
+                          disabled={
+                            !masterEnabled ||
+                            !day.enabled ||
+                            lockedBySame ||
+                            day.dailyMaxUnconstrained ||
+                            day.dailyMax <= 1
+                          }
+                          onClick={() =>
+                            updateDay(key, { dailyMax: Math.max(1, day.dailyMax - 1) })
+                          }
+                        >
+                          −
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={day.dailyMax}
+                          disabled={
+                            !masterEnabled ||
+                            !day.enabled ||
+                            lockedBySame ||
+                            day.dailyMaxUnconstrained
+                          }
+                          onChange={(e) =>
+                            updateDay(key, {
+                              dailyMax: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                            })
+                          }
+                        />
+                        <button
+                          type="button"
+                          disabled={
+                            !masterEnabled ||
+                            !day.enabled ||
+                            lockedBySame ||
+                            day.dailyMaxUnconstrained ||
+                            day.dailyMax >= 99
+                          }
+                          onClick={() =>
+                            updateDay(key, { dailyMax: Math.min(99, day.dailyMax + 1) })
+                          }
+                        >
+                          +
+                        </button>
+                      </div>
                     </div>
 
                     <button

@@ -873,11 +873,55 @@
   background: #64748b;
 }
 
+.rc-customer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rc-all-customers {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: var(--rc-fg);
+  text-transform: none;
+  letter-spacing: 0;
+  user-select: none;
+}
+
+.rc-all-customers input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--rc-blue);
+}
+
+.rc-customer-card.is-all {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.rc-customer-card.is-all .rc-customer-avatar {
+  background: var(--rc-blue);
+  color: #fff;
+  font-size: 11px;
+}
+
+.rc-add-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .rc-global-caps {
   display: grid;
-  grid-template-columns: repeat(2, minmax(180px, 240px));
+  grid-template-columns: minmax(180px, 240px);
   gap: 10px;
   margin-bottom: 12px;
+}
+
+.rc-constraint-loads {
+  grid-template-columns: auto minmax(90px, 1fr);
 }
 
 .rc-cap {
@@ -911,7 +955,7 @@
     minmax(140px, 1.1fr)
     minmax(140px, 1.1fr)
     minmax(140px, 1.1fr)
-    110px
+    minmax(150px, 1.1fr)
     64px;
   gap: 8px;
   align-items: center;
