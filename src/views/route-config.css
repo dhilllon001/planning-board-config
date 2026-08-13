@@ -958,7 +958,7 @@
 .rc-stop-card {
   position: relative;
   min-width: 0;
-  padding: 16px 16px 40px 18px;
+  padding: 16px 16px 16px 18px;
   border-radius: 14px;
   border: 1px solid rgba(60, 60, 67, 0.14);
   background: #fff;
@@ -1087,11 +1087,9 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.rc-driver-bar {
+.rc-equipment-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
   margin-top: 12px;
   padding: 12px 14px;
   border-radius: 12px;
@@ -1100,46 +1098,44 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
-.rc-driver-info {
+.rc-equipment-field {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 360px;
 }
 
-.rc-driver-label {
+.rc-equipment-label {
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: #636366;
+  flex-shrink: 0;
 }
 
-.rc-driver-info strong {
-  font-size: 16px;
-  font-weight: 750;
+.rc-equipment-field select {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  padding: 0 36px 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(60, 60, 67, 0.18);
+  background: #f2f2f7
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%231c1c1e' d='M1.4 1.4 6 6l4.6-4.6L12 2.8 6 8.8 0 2.8z'/%3E%3C/svg%3E")
+    no-repeat right 12px center;
   color: #111111;
+  font-size: 14px;
+  font-weight: 650;
+  appearance: none;
+  outline: 0;
 }
 
-.rc-driver-info strong.is-empty {
-  color: #c77700;
-}
-
-.rc-driver-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: flex-end;
-}
-
-.rc-driver-meta span {
-  font-size: 12px;
-  font-weight: 700;
-  color: #1c1c1e;
-  background: #f2f2f7;
-  border: 1px solid rgba(60, 60, 67, 0.12);
-  padding: 5px 10px;
-  border-radius: 999px;
+.rc-equipment-field select:focus {
+  border-color: #007aff;
+  background-color: #fff;
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18);
 }
 
 .rc-miles {
@@ -1623,13 +1619,10 @@
     padding: 4px 24px;
   }
 
-  .rc-driver-bar {
+  .rc-equipment-field {
+    max-width: none;
     flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .rc-driver-meta {
-    justify-content: flex-start;
+    align-items: stretch;
   }
 }
 

@@ -5,6 +5,15 @@ import { BOARDS, CUSTOMERS } from '../data/seed'
 import type { DayKey } from '../types'
 import './route-config.css'
 
+const EQUIPMENT_OPTIONS = [
+  'DRY-VAN',
+  'REEFER',
+  'FLATBED',
+  'POWER-ONLY',
+  'STEP-DECK',
+  'TANKER',
+] as const
+
 const DAYS: { key: DayKey; label: string; full: string }[] = [
   { key: 'mon', label: 'Mon', full: 'Monday' },
   { key: 'tue', label: 'Tue', full: 'Tuesday' },
@@ -102,6 +111,7 @@ export default function RouteConfigPage({
   const [masterEnabled, setMasterEnabled] = useState(true)
   const [schedule, setSchedule] = useState<ScheduleMap>(() => defaultSchedule())
   const [stopMode, setStopMode] = useState<StopDisplayMode>('city')
+  const [equipment, setEquipment] = useState(leg.equipment)
   const [globalWeeklyMax, setGlobalWeeklyMax] = useState(30)
   const [customerQuery, setCustomerQuery] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -256,6 +266,7 @@ export default function RouteConfigPage({
     setMasterEnabled(true)
     setSchedule(defaultSchedule())
     setStopMode('city')
+    setEquipment(leg.equipment)
     setGlobalWeeklyMax(30)
     setDirty(false)
     setToast('Changes discarded')
@@ -425,7 +436,6 @@ export default function RouteConfigPage({
                   ) : (
                     <p>{leg.start.name}</p>
                   )}
-                  <span className="rc-stop-status">{leg.equipment}</span>
                 </article>
 
                 <div className="rc-leg-connector" aria-hidden="true">
@@ -443,21 +453,30 @@ export default function RouteConfigPage({
                     {stopMode === 'location' ? leg.end.name : leg.end.city}
                   </h3>
                   {stopMode === 'location' ? <p>{leg.end.city}</p> : <p>{leg.end.name}</p>}
-                  <span className="rc-stop-status end">{leg.assigned}</span>
                 </article>
               </div>
 
-              <div className="rc-driver-bar">
-                <div className="rc-driver-info">
-                  <span className="rc-driver-label">Driver</span>
-                  <strong className={leg.driver ? '' : 'is-empty'}>
-                    {leg.driver ?? 'Unassigned'}
-                  </strong>
-                </div>
-                <div className="rc-driver-meta">
-                  <span>{leg.equipment}</span>
-                  <span>{leg.assigned}</span>
-                </div>
+              <div className="rc-equipment-bar">
+                <label className="rc-equipment-field" htmlFor="rc-equipment-select">
+                  <span className="rc-equipment-label">Equipment</span>
+                  <select
+                    id="rc-equipment-select"
+                    value={equipment}
+                    onChange={(e) => {
+                      setEquipment(e.target.value)
+                      markDirty()
+                    }}
+                  >
+                    {!EQUIPMENT_OPTIONS.includes(
+                      equipment as (typeof EQUIPMENT_OPTIONS)[number],
+                    ) && <option value={equipment}>{equipment}</option>}
+                    {EQUIPMENT_OPTIONS.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
             </div>
           </section>
