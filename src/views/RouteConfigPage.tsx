@@ -447,8 +447,17 @@ export default function RouteConfigPage({
                 </article>
               </div>
 
-              <div className="rc-meta">
-                <span>{leg.driver ?? 'Unassigned'}</span>
+              <div className="rc-driver-bar">
+                <div className="rc-driver-info">
+                  <span className="rc-driver-label">Driver</span>
+                  <strong className={leg.driver ? '' : 'is-empty'}>
+                    {leg.driver ?? 'Unassigned'}
+                  </strong>
+                </div>
+                <div className="rc-driver-meta">
+                  <span>{leg.equipment}</span>
+                  <span>{leg.assigned}</span>
+                </div>
               </div>
             </div>
           </section>

@@ -951,59 +951,84 @@
 .rc-leg-flow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 10px;
+  gap: 12px;
   align-items: stretch;
 }
 
 .rc-stop-card {
   position: relative;
   min-width: 0;
-  padding: 14px 16px 36px;
+  padding: 16px 16px 40px 18px;
   border-radius: 14px;
-  border: 1px solid var(--rc-border);
+  border: 1px solid rgba(60, 60, 67, 0.14);
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.rc-stop-card::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: #8e8e93;
+}
+
+.rc-stop-card.kind-pickup::before,
+.rc-stop-card.kind-hook::before {
+  background: #007aff;
+}
+
+.rc-stop-card.kind-delivery::before {
+  background: #34c759;
+}
+
+.rc-stop-card.kind-drop::before {
+  background: #ff9500;
 }
 
 .rc-stop-card-top {
   display: flex;
   align-items: baseline;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .rc-stop-kind {
-  font-size: 11px;
-  font-weight: 750;
+  font-size: 12px;
+  font-weight: 800;
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
 .rc-stop-card.kind-pickup .rc-stop-kind,
 .rc-stop-card.kind-hook .rc-stop-kind {
-  color: #007aff;
+  color: #0051d5;
 }
 
 .rc-stop-card.kind-delivery .rc-stop-kind {
-  color: #34c759;
+  color: #1f7a38;
 }
 
 .rc-stop-card.kind-drop .rc-stop-kind {
-  color: #ff9500;
+  color: #c77700;
 }
 
 .rc-stop-time {
-  font-size: 12px;
-  color: var(--rc-muted);
+  font-size: 13px;
+  font-weight: 600;
+  color: #3a3a3c;
 }
 
 .rc-stop-card h3 {
   margin: 0;
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
   line-height: 1.3;
-  color: var(--rc-fg);
+  color: #111111;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1011,10 +1036,11 @@
 }
 
 .rc-stop-card p {
-  margin: 6px 0 0;
+  margin: 8px 0 0;
   font-size: 13px;
-  line-height: 1.35;
-  color: var(--rc-muted);
+  line-height: 1.4;
+  font-weight: 500;
+  color: #3a3a3c;
   overflow: hidden;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -1026,55 +1052,93 @@
   right: 14px;
   bottom: 12px;
   font-size: 12px;
-  font-weight: 650;
-  color: #34c759;
+  font-weight: 700;
+  color: #1f7a38;
 }
 
 .rc-stop-status.end {
-  color: #ff9500;
+  color: #c77700;
 }
 
 .rc-leg-connector {
   display: flex;
   align-items: center;
-  min-width: 88px;
-  max-width: 120px;
+  min-width: 96px;
+  max-width: 130px;
   align-self: center;
 }
 
 .rc-leg-line {
   flex: 1;
-  border-top: 1.5px dashed #c7c7cc;
-  min-width: 12px;
+  border-top: 2px dashed #aeaeb2;
+  min-width: 14px;
 }
 
 .rc-leg-miles {
-  margin: 0 6px;
-  padding: 4px 8px;
+  margin: 0 8px;
+  padding: 6px 10px;
   border-radius: 999px;
-  border: 1px solid var(--rc-border);
+  border: 1px solid rgba(60, 60, 67, 0.18);
   background: #fff;
   font-size: 12px;
-  font-weight: 700;
-  color: #636366;
+  font-weight: 800;
+  color: #1c1c1e;
   white-space: nowrap;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
 }
 
-.rc-meta {
+.rc-driver-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(60, 60, 67, 0.14);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.rc-driver-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.rc-driver-label {
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #636366;
+}
+
+.rc-driver-info strong {
+  font-size: 16px;
+  font-weight: 750;
+  color: #111111;
+}
+
+.rc-driver-info strong.is-empty {
+  color: #c77700;
+}
+
+.rc-driver-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  justify-content: flex-end;
 }
 
-.rc-meta span {
+.rc-driver-meta span {
   font-size: 12px;
-  font-weight: 650;
-  color: var(--rc-muted);
-  background: #fff;
-  border: 1px solid var(--rc-border);
-  padding: 4px 9px;
+  font-weight: 700;
+  color: #1c1c1e;
+  background: #f2f2f7;
+  border: 1px solid rgba(60, 60, 67, 0.12);
+  padding: 5px 10px;
   border-radius: 999px;
 }
 
@@ -1557,6 +1621,15 @@
     width: 100%;
     min-width: 0;
     padding: 4px 24px;
+  }
+
+  .rc-driver-bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .rc-driver-meta {
+    justify-content: flex-start;
   }
 }
 
