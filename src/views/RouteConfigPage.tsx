@@ -471,9 +471,12 @@ export default function RouteConfigPage({
             </div>
 
             <div className="rc-global-caps">
-              <label className="rc-cap">
-                <span>Weekly max</span>
-                <div className="rc-input">
+              <div className="rc-cap-card">
+                <div>
+                  <span className="rc-cap-title">Weekly max</span>
+                  <p>Total loads allowed across enabled days</p>
+                </div>
+                <div className="rc-input rc-input-lg">
                   <input
                     type="number"
                     min={1}
@@ -485,210 +488,233 @@ export default function RouteConfigPage({
                       markDirty()
                     }}
                   />
-                  <em>loads</em>
+                  <em>loads / week</em>
                 </div>
-              </label>
+              </div>
             </div>
 
-            <div className={`rc-day-table ${masterEnabled ? '' : 'is-off'}`}>
-              <div className="rc-day-head">
-                <span>Day</span>
-                <span>Status</span>
-                <span>Same as above</span>
-                <span>Lead time</span>
-                <span>From</span>
-                <span>To</span>
-                <span>Daily max</span>
-                <span />
-              </div>
-
-              {DAYS.map(({ key, label }, index) => {
+            <div className={`rc-day-stack ${masterEnabled ? '' : 'is-off'}`}>
+              {DAYS.map(({ key, label, full }, index) => {
                 const day = schedule[key]
                 const lockedBySame = day.sameAsAbove
                 return (
-                  <div key={key} className={`rc-day-row ${day.enabled ? 'is-enabled' : ''}`}>
-                    <span className="rc-day-name">{label}</span>
-
-                    <div className="rc-day-status">
-                      <button
-                        type="button"
-                        className={day.enabled ? 'is-on' : ''}
-                        disabled={!masterEnabled}
-                        onClick={() => updateDay(key, { enabled: true })}
-                      >
-                        On
-                      </button>
-                      <button
-                        type="button"
-                        className={!day.enabled ? 'is-off' : ''}
-                        disabled={!masterEnabled}
-                        onClick={() => updateDay(key, { enabled: false })}
-                      >
-                        Off
-                      </button>
-                    </div>
-
-                    <label className={`rc-same ${index === 0 ? 'is-disabled' : ''}`}>
-                      <input
-                        type="checkbox"
-                        checked={day.sameAsAbove}
-                        disabled={!masterEnabled || index === 0 || !day.enabled}
-                        onChange={(e) => setSameAsAbove(key, e.target.checked)}
-                      />
-                      <span>Same as above</span>
-                    </label>
-
-                    <div className={`rc-constraint ${day.leadUnconstrained ? 'is-any' : ''}`}>
-                      <label className="rc-any">
-                        <input
-                          type="checkbox"
-                          checked={day.leadUnconstrained}
-                          disabled={!masterEnabled || !day.enabled || lockedBySame}
-                          onChange={(e) =>
-                            updateDay(key, { leadUnconstrained: e.target.checked })
-                          }
-                        />
-                        <span>Any</span>
-                      </label>
-                      <div className="rc-input">
-                        <input
-                          type="number"
-                          min={1}
-                          max={168}
-                          value={day.leadTimeHours}
-                          disabled={
-                            !masterEnabled || !day.enabled || day.leadUnconstrained || lockedBySame
-                          }
-                          onChange={(e) =>
-                            updateDay(key, {
-                              leadTimeHours: Math.max(
-                                1,
-                                Math.min(168, Number(e.target.value) || 1),
-                              ),
-                            })
-                          }
-                        />
-                        <em>hrs</em>
+                  <article
+                    key={key}
+                    className={`rc-day-card ${day.enabled ? 'is-enabled' : 'is-disabled'} ${lockedBySame ? 'is-linked' : ''}`}
+                  >
+                    <header className="rc-day-card-head">
+                      <div className="rc-day-identity">
+                        <strong>{label}</strong>
+                        <span>{full}</span>
                       </div>
-                    </div>
 
-                    <div className={`rc-constraint ${day.fromUnconstrained ? 'is-any' : ''}`}>
-                      <label className="rc-any">
-                        <input
-                          type="checkbox"
-                          checked={day.fromUnconstrained}
-                          disabled={!masterEnabled || !day.enabled || lockedBySame}
-                          onChange={(e) =>
-                            updateDay(key, { fromUnconstrained: e.target.checked })
-                          }
-                        />
-                        <span>Any</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={day.start}
-                        disabled={
-                          !masterEnabled || !day.enabled || day.fromUnconstrained || lockedBySame
-                        }
-                        onChange={(e) => updateDay(key, { start: e.target.value })}
-                      />
-                    </div>
+                      <div className="rc-day-head-actions">
+                        {index > 0 && (
+                          <label className="rc-same">
+                            <input
+                              type="checkbox"
+                              checked={day.sameAsAbove}
+                              disabled={!masterEnabled || !day.enabled}
+                              onChange={(e) => setSameAsAbove(key, e.target.checked)}
+                            />
+                            <span>Same as above</span>
+                          </label>
+                        )}
 
-                    <div className={`rc-constraint ${day.toUnconstrained ? 'is-any' : ''}`}>
-                      <label className="rc-any">
-                        <input
-                          type="checkbox"
-                          checked={day.toUnconstrained}
-                          disabled={!masterEnabled || !day.enabled || lockedBySame}
-                          onChange={(e) => updateDay(key, { toUnconstrained: e.target.checked })}
-                        />
-                        <span>Any</span>
-                      </label>
-                      <input
-                        type="time"
-                        value={day.end}
-                        disabled={
-                          !masterEnabled || !day.enabled || day.toUnconstrained || lockedBySame
-                        }
-                        onChange={(e) => updateDay(key, { end: e.target.value })}
-                      />
-                    </div>
+                        <div className="rc-day-status">
+                          <button
+                            type="button"
+                            className={day.enabled ? 'is-on' : ''}
+                            disabled={!masterEnabled}
+                            onClick={() => updateDay(key, { enabled: true })}
+                          >
+                            On
+                          </button>
+                          <button
+                            type="button"
+                            className={!day.enabled ? 'is-off' : ''}
+                            disabled={!masterEnabled}
+                            onClick={() => updateDay(key, { enabled: false })}
+                          >
+                            Off
+                          </button>
+                        </div>
 
-                    <div
-                      className={`rc-constraint rc-constraint-loads ${day.dailyMaxUnconstrained ? 'is-any' : ''}`}
-                    >
-                      <label className="rc-any">
-                        <input
-                          type="checkbox"
-                          checked={day.dailyMaxUnconstrained}
-                          disabled={!masterEnabled || !day.enabled || lockedBySame}
-                          onChange={(e) =>
-                            updateDay(key, { dailyMaxUnconstrained: e.target.checked })
-                          }
-                        />
-                        <span>Any</span>
-                      </label>
-                      <div className="rc-loads">
                         <button
                           type="button"
-                          disabled={
-                            !masterEnabled ||
-                            !day.enabled ||
-                            lockedBySame ||
-                            day.dailyMaxUnconstrained ||
-                            day.dailyMax <= 1
-                          }
-                          onClick={() =>
-                            updateDay(key, { dailyMax: Math.max(1, day.dailyMax - 1) })
-                          }
+                          className="rc-clear-row"
+                          disabled={!masterEnabled}
+                          title={`Clear ${label}`}
+                          onClick={() => clearDay(key)}
                         >
-                          −
-                        </button>
-                        <input
-                          type="number"
-                          min={1}
-                          max={99}
-                          value={day.dailyMax}
-                          disabled={
-                            !masterEnabled ||
-                            !day.enabled ||
-                            lockedBySame ||
-                            day.dailyMaxUnconstrained
-                          }
-                          onChange={(e) =>
-                            updateDay(key, {
-                              dailyMax: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
-                            })
-                          }
-                        />
-                        <button
-                          type="button"
-                          disabled={
-                            !masterEnabled ||
-                            !day.enabled ||
-                            lockedBySame ||
-                            day.dailyMaxUnconstrained ||
-                            day.dailyMax >= 99
-                          }
-                          onClick={() =>
-                            updateDay(key, { dailyMax: Math.min(99, day.dailyMax + 1) })
-                          }
-                        >
-                          +
+                          Clear
                         </button>
                       </div>
-                    </div>
+                    </header>
 
-                    <button
-                      type="button"
-                      className="rc-clear-row"
-                      disabled={!masterEnabled}
-                      title={`Clear ${label}`}
-                      onClick={() => clearDay(key)}
-                    >
-                      Clear
-                    </button>
-                  </div>
+                    <div className="rc-day-fields">
+                      <div className={`rc-field-block ${day.leadUnconstrained ? 'is-any' : ''}`}>
+                        <div className="rc-field-top">
+                          <span>Lead time</span>
+                          <label className="rc-any">
+                            <input
+                              type="checkbox"
+                              checked={day.leadUnconstrained}
+                              disabled={!masterEnabled || !day.enabled || lockedBySame}
+                              onChange={(e) =>
+                                updateDay(key, { leadUnconstrained: e.target.checked })
+                              }
+                            />
+                            <span>Any</span>
+                          </label>
+                        </div>
+                        <div className="rc-input">
+                          <input
+                            type="number"
+                            min={1}
+                            max={168}
+                            value={day.leadTimeHours}
+                            disabled={
+                              !masterEnabled ||
+                              !day.enabled ||
+                              day.leadUnconstrained ||
+                              lockedBySame
+                            }
+                            onChange={(e) =>
+                              updateDay(key, {
+                                leadTimeHours: Math.max(
+                                  1,
+                                  Math.min(168, Number(e.target.value) || 1),
+                                ),
+                              })
+                            }
+                          />
+                          <em>hrs</em>
+                        </div>
+                      </div>
+
+                      <div className={`rc-field-block ${day.fromUnconstrained ? 'is-any' : ''}`}>
+                        <div className="rc-field-top">
+                          <span>From</span>
+                          <label className="rc-any">
+                            <input
+                              type="checkbox"
+                              checked={day.fromUnconstrained}
+                              disabled={!masterEnabled || !day.enabled || lockedBySame}
+                              onChange={(e) =>
+                                updateDay(key, { fromUnconstrained: e.target.checked })
+                              }
+                            />
+                            <span>Any</span>
+                          </label>
+                        </div>
+                        <input
+                          type="time"
+                          value={day.start}
+                          disabled={
+                            !masterEnabled ||
+                            !day.enabled ||
+                            day.fromUnconstrained ||
+                            lockedBySame
+                          }
+                          onChange={(e) => updateDay(key, { start: e.target.value })}
+                        />
+                      </div>
+
+                      <div className={`rc-field-block ${day.toUnconstrained ? 'is-any' : ''}`}>
+                        <div className="rc-field-top">
+                          <span>To</span>
+                          <label className="rc-any">
+                            <input
+                              type="checkbox"
+                              checked={day.toUnconstrained}
+                              disabled={!masterEnabled || !day.enabled || lockedBySame}
+                              onChange={(e) =>
+                                updateDay(key, { toUnconstrained: e.target.checked })
+                              }
+                            />
+                            <span>Any</span>
+                          </label>
+                        </div>
+                        <input
+                          type="time"
+                          value={day.end}
+                          disabled={
+                            !masterEnabled || !day.enabled || day.toUnconstrained || lockedBySame
+                          }
+                          onChange={(e) => updateDay(key, { end: e.target.value })}
+                        />
+                      </div>
+
+                      <div
+                        className={`rc-field-block ${day.dailyMaxUnconstrained ? 'is-any' : ''}`}
+                      >
+                        <div className="rc-field-top">
+                          <span>Daily max</span>
+                          <label className="rc-any">
+                            <input
+                              type="checkbox"
+                              checked={day.dailyMaxUnconstrained}
+                              disabled={!masterEnabled || !day.enabled || lockedBySame}
+                              onChange={(e) =>
+                                updateDay(key, { dailyMaxUnconstrained: e.target.checked })
+                              }
+                            />
+                            <span>Any</span>
+                          </label>
+                        </div>
+                        <div className="rc-loads">
+                          <button
+                            type="button"
+                            disabled={
+                              !masterEnabled ||
+                              !day.enabled ||
+                              lockedBySame ||
+                              day.dailyMaxUnconstrained ||
+                              day.dailyMax <= 1
+                            }
+                            onClick={() =>
+                              updateDay(key, { dailyMax: Math.max(1, day.dailyMax - 1) })
+                            }
+                          >
+                            −
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            max={99}
+                            value={day.dailyMax}
+                            disabled={
+                              !masterEnabled ||
+                              !day.enabled ||
+                              lockedBySame ||
+                              day.dailyMaxUnconstrained
+                            }
+                            onChange={(e) =>
+                              updateDay(key, {
+                                dailyMax: Math.max(1, Math.min(99, Number(e.target.value) || 1)),
+                              })
+                            }
+                          />
+                          <button
+                            type="button"
+                            disabled={
+                              !masterEnabled ||
+                              !day.enabled ||
+                              lockedBySame ||
+                              day.dailyMaxUnconstrained ||
+                              day.dailyMax >= 99
+                            }
+                            onClick={() =>
+                              updateDay(key, { dailyMax: Math.min(99, day.dailyMax + 1) })
+                            }
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
                 )
               })}
             </div>
