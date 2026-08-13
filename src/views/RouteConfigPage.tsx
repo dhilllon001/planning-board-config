@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, Check, Eraser, Plus, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Check, Eraser, Plus, Search, X } from 'lucide-react'
 import type { BoardLeg } from '../data/boardSeed'
 import { BOARDS, CUSTOMERS } from '../data/seed'
 import type { DayKey } from '../types'
@@ -103,10 +103,27 @@ export default function RouteConfigPage({
   const [schedule, setSchedule] = useState<ScheduleMap>(() => defaultSchedule())
   const [stopMode, setStopMode] = useState<StopDisplayMode>('city')
   const [globalWeeklyMax, setGlobalWeeklyMax] = useState(30)
+  const [customerQuery, setCustomerQuery] = useState('')
   const [pickerOpen, setPickerOpen] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [dirty, setDirty] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
+
+  const listedCustomers = useMemo(() => {
+    const q = customerQuery.trim().toLowerCase()
+    const source = allCustomers ? CUSTOMERS : customers
+    if (!q) return source
+    return source.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        c.tag.toLowerCase().includes(q) ||
+        c.id.toLowerCase().includes(q),
+    )
+  }, [allCustomers, customers, customerQuery])
+
+  const availableToAdd = CUSTOMERS.filter(
+    (c) => !customers.some((s) => s.name === c.name || s.id === c.id),
+  )
 
   useEffect(() => {
     if (!toast) return
@@ -131,10 +148,6 @@ export default function RouteConfigPage({
       document.removeEventListener('keydown', onKey)
     }
   }, [pickerOpen])
-
-  const availableToAdd = CUSTOMERS.filter(
-    (c) => !customers.some((s) => s.name === c.name || s.id === c.id),
-  )
 
   function markDirty() {
     setDirty(true)
@@ -278,95 +291,106 @@ export default function RouteConfigPage({
         </div>
       </header>
 
-      <div className="rc-shell is-single">
-        <main className="rc-main">
-          <section className="rc-context">
-            <div className="rc-context-block">
-              <div className="rc-label-row">
-                <span>Selected customers</span>
-                <div className="rc-customer-toolbar">
-                  <label className="rc-all-customers">
-                    <input
-                      type="checkbox"
-                      checked={allCustomers}
-                      onChange={(e) => toggleAllCustomers(e.target.checked)}
-                    />
-                    <span>All customers</span>
-                  </label>
-                  <div className="rc-add-wrap" ref={pickerRef}>
-                    <button
-                      type="button"
-                      className="rc-add-btn"
-                      disabled={allCustomers}
-                      onClick={() => setPickerOpen((v) => !v)}
-                      title="Add customer"
-                      aria-expanded={pickerOpen}
-                    >
-                      <Plus size={14} />
-                      Add customer
-                    </button>
-                    {pickerOpen && !allCustomers && (
-                      <div className="rc-picker">
-                        {availableToAdd.length === 0 ? (
-                          <p className="rc-picker-empty">All customers added</p>
-                        ) : (
-                          availableToAdd.map((c) => (
-                            <button key={c.id} type="button" onClick={() => addCustomer(c)}>
-                              <span className="rc-picker-avatar">{customerInitials(c.name)}</span>
-                              <span className="rc-picker-copy">
-                                <strong>{c.name}</strong>
-                                <em>{c.tag}</em>
-                              </span>
-                            </button>
-                          ))
-                        )}
-                      </div>
+      <div className="rc-shell">
+        <aside className="rc-customers-pane" aria-label="Selected customers">
+          <div className="rc-customers-card">
+            <div className="rc-customers-card-head">
+              <div>
+                <h2>Customers</h2>
+                <p>
+                  {allCustomers
+                    ? `${CUSTOMERS.length} customers`
+                    : `${customers.length} selected`}
+                </p>
+              </div>
+              <div className="rc-add-wrap" ref={pickerRef}>
+                <button
+                  type="button"
+                  className="rc-add-btn"
+                  disabled={allCustomers}
+                  onClick={() => setPickerOpen((v) => !v)}
+                  aria-expanded={pickerOpen}
+                >
+                  <Plus size={14} />
+                </button>
+                {pickerOpen && !allCustomers && (
+                  <div className="rc-picker">
+                    {availableToAdd.length === 0 ? (
+                      <p className="rc-picker-empty">All customers added</p>
+                    ) : (
+                      availableToAdd.map((c) => (
+                        <button key={c.id} type="button" onClick={() => addCustomer(c)}>
+                          <span className="rc-picker-avatar">{customerInitials(c.name)}</span>
+                          <span className="rc-picker-copy">
+                            <strong>{c.name}</strong>
+                            <em>{c.tag}</em>
+                          </span>
+                        </button>
+                      ))
                     )}
                   </div>
-                </div>
+                )}
               </div>
-
-              {allCustomers ? (
-                <div className="rc-customer-list">
-                  <div className="rc-customer-card is-all">
-                    <span className="rc-customer-avatar">ALL</span>
-                    <div className="rc-customer-text">
-                      <strong>All customers</strong>
-                      <span>This configuration applies to every customer</span>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="rc-customer-list">
-                  {customers.map((c) => (
-                    <div
-                      key={c.id}
-                      className={`rc-customer-card tone-${c.tag.toLowerCase().replace(/\s+/g, '-')}`}
-                    >
-                      <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
-                      <div className="rc-customer-text">
-                        <strong>{c.name}</strong>
-                        <span>
-                          <em className="rc-tag">{c.tag}</em>
-                          {c.id}
-                        </span>
-                      </div>
-                      {customers.length > 1 && (
-                        <button
-                          type="button"
-                          className="rc-remove"
-                          aria-label={`Remove ${c.name}`}
-                          onClick={() => removeCustomer(c.id)}
-                        >
-                          <X size={12} />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
+            <label className="rc-all-switch">
+              <span>
+                <strong>All customers</strong>
+                <em>Apply this config to every customer</em>
+              </span>
+              <input
+                type="checkbox"
+                checked={allCustomers}
+                onChange={(e) => toggleAllCustomers(e.target.checked)}
+              />
+            </label>
+
+            <div className="rc-customers-search">
+              <Search size={14} />
+              <input
+                value={customerQuery}
+                onChange={(e) => setCustomerQuery(e.target.value)}
+                placeholder="Search customers"
+              />
+            </div>
+
+            <ul className="rc-customers-list">
+              {listedCustomers.map((c) => (
+                <li key={c.id}>
+                  <div
+                    className={`rc-customer-row tone-${c.tag.toLowerCase().replace(/\s+/g, '-')} ${allCustomers ? 'is-all' : 'is-selected'}`}
+                  >
+                    <span className="rc-customer-avatar">{customerInitials(c.name)}</span>
+                    <div className="rc-customer-text">
+                      <strong>{c.name}</strong>
+                      <span>
+                        <em className="rc-tag">{c.tag}</em>
+                        {c.id}
+                      </span>
+                    </div>
+                    {!allCustomers && customers.length > 1 && (
+                      <button
+                        type="button"
+                        className="rc-remove"
+                        aria-label={`Remove ${c.name}`}
+                        onClick={() => removeCustomer(c.id)}
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                    {allCustomers && <Check size={14} className="rc-customer-check" />}
+                  </div>
+                </li>
+              ))}
+              {listedCustomers.length === 0 && (
+                <li className="rc-customers-empty">No customers match</li>
+              )}
+            </ul>
+          </div>
+        </aside>
+
+        <main className="rc-main">
+          <section className="rc-context">
             <div className="rc-context-block rc-route-block">
               <div className="rc-label-row">
                 <span>Selected route</span>
